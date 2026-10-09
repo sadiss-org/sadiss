@@ -27,6 +27,11 @@ export function usePlayer() {
   }
 
   const startAudioCtx = () => {
+    // Tells WebKit this page plays media, so iOS keeps the context running
+    // while the screen is locked. Needs the app's `audio` background mode.
+    const { audioSession } = navigator as Navigator & { audioSession?: { type: string } }
+    if (audioSession) audioSession.type = 'playback'
+
     ctx = new AudioContext()
 
     ctx.onstatechange = () => {
