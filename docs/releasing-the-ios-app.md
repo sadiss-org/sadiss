@@ -22,7 +22,8 @@ Store Connect.
 and the Android `versionName`.
 
 The build number is not edited by hand. The workflow sets it to the run number
-of the repository it runs in. It only has to be unique within one
+of the repository it runs in, plus 3 for the builds uploaded from a fork before
+the repository had its own secrets. It only has to be unique within one
 `MARKETING_VERSION`, but moving the workflow to a different repository restarts
 the run numbers at 1, and App Store Connect rejects a build number it has
 already seen for that version.
