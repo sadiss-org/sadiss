@@ -13,6 +13,42 @@ let outputLatencyOffset = 0
 let ttsLanguage: string
 let waveform: OscillatorType
 let ttsRate = 1
+let keepAlive: HTMLAudioElement | undefined
+
+/**
+ * One second of 8 kHz mono 16-bit silence as a WAV blob URL.
+ */
+const silentWavUrl = () => {
+  const sampleRate = 8000
+  const dataBytes = sampleRate * 2
+  const view = new DataView(new ArrayBuffer(44 + dataBytes))
+  const ascii = (at: number, text: string) => [...text].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)))
+  ascii(0, 'RIFF')
+  view.setUint32(4, 36 + dataBytes, true)
+  ascii(8, 'WAVEfmt ')
+  view.setUint32(16, 16, true) // fmt chunk size
+  view.setUint16(20, 1, true) // PCM
+  view.setUint16(22, 1, true) // mono
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true) // byte rate
+  view.setUint16(32, 2, true) // block align
+  view.setUint16(34, 16, true) // bits per sample
+  ascii(36, 'data')
+  view.setUint32(40, dataBytes, true)
+  return URL.createObjectURL(new Blob([view], { type: 'audio/wav' }))
+}
+
+/**
+ * Loops silence through a media element, so iOS counts the app as playing
+ * media for as long as it runs, including the gaps between chunks. Must be
+ * called from a user gesture.
+ */
+const startKeepAlive = () => {
+  if (keepAlive) return
+  keepAlive = new Audio(silentWavUrl())
+  keepAlive.loop = true
+  keepAlive.play().catch((error) => console.warn('Silent keep-alive did not start:', error))
+}
 
 export function usePlayer() {
   const oscillators: OscillatorObject[] = []
@@ -31,6 +67,7 @@ export function usePlayer() {
     // while the screen is locked. Needs the app's `audio` background mode.
     const { audioSession } = navigator as Navigator & { audioSession?: { type: string } }
     if (audioSession) audioSession.type = 'playback'
+    startKeepAlive()
 
     ctx = new AudioContext()
 
