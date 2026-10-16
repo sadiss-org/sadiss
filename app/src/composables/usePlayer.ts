@@ -42,12 +42,20 @@ const silentWavUrl = () => {
  * Loops silence through a media element, so iOS counts the app as playing
  * media for as long as it runs, including the gaps between chunks. Must be
  * called from a user gesture.
+ *
+ * The lock screen's play and pause buttons act on this element; they do
+ * nothing, because the server decides when a performance plays.
  */
 const startKeepAlive = () => {
   if (keepAlive) return
   keepAlive = new Audio(silentWavUrl())
   keepAlive.loop = true
   keepAlive.play().catch((error) => console.warn('Silent keep-alive did not start:', error))
+
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('play', () => {})
+    navigator.mediaSession.setActionHandler('pause', () => {})
+  }
 }
 
 export function usePlayer() {
