@@ -260,7 +260,7 @@ export const editTrack = async (req: Request, res: Response) => {
       return
     }
 
-    const patch = req.body
+    const patch = pickEditableTrackFields(req.body)
 
     // Editing track currently disabled since it doesn't work correctly
     // see https://github.com/wildyeast/sadiss/issues/71#issuecomment-1587183286 for more information
@@ -310,6 +310,13 @@ export const editTrack = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Server error' })
   }
 }
+
+// The fields the track edit form changes. Everything else, such as the owner,
+// the deleted flag and the stored files, stays as it is.
+const editableTrackFields = ['name', 'notes', 'mode', 'waveform', 'ttsRate', 'isPublic'] as const
+
+const pickEditableTrackFields = (body: Record<string, unknown>) =>
+  Object.fromEntries(editableTrackFields.filter((field) => field in body).map((field) => [field, body[field]]))
 
 export const stopTrack = (req: Request, res: Response) => {
   if (stopSession(req.body.performanceId)) {

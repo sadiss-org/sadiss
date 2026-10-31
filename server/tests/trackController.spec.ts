@@ -313,6 +313,31 @@ describe('trackController test', () => {
       expect(resEdit.body.ttsRate).toBe(0.5)
     })
 
+    it('should leave fields the edit form does not send unchanged', async () => {
+      const track = await createTestTrack('partialsAndTts')
+      const before = await Track.findById(track._id).lean()
+
+      await agent
+        .post(`/api/track/edit/${track._id}`)
+        .send({
+          name: 'test track edited',
+          creator: generateMockId(),
+          deleted: true,
+          chunkFileName: 'other-chunks',
+          partialFile: null,
+          ttsFiles: {}
+        })
+        .expect(200)
+
+      const after = await Track.findById(track._id).lean()
+      expect(after!.name).toBe('test track edited')
+      expect(after!.creator.toString()).toBe(mockUser.id)
+      expect(after!.deleted).toBe(before!.deleted)
+      expect(after!.chunkFileName).toBe(before!.chunkFileName)
+      expect(after!.partialFile).toEqual(before!.partialFile)
+      expect(after!.ttsFiles).toEqual(before!.ttsFiles)
+    })
+
     it('should not edit track if the TTS rate is not a number or outside 0.2 to 1.5', async () => {
       const track = await createTestTrack('tts')
       await agent.post(`/api/track/edit/${track._id}`).field('ttsRate', 'fast').expect(400)
