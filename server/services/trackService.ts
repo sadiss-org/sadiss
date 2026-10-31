@@ -159,7 +159,7 @@ interface TrackJson {
   notes: string
   ttsLangs: string[]
   waveform: string
-  ttsRate: string
+  ttsRate: number
   partialFile: {
     origName: string
     fileName: string
@@ -190,7 +190,7 @@ export async function uploadTrackFromJson(
     formData.append('notes', trackJson.notes)
     formData.append('ttsLangs', JSON.stringify(trackJson.ttsLangs))
     formData.append('waveform', trackJson.waveform)
-    formData.append('ttsRate', trackJson.ttsRate)
+    formData.append('ttsRate', String(trackJson.ttsRate))
     formData.append('isPublic', String(trackJson.isPublic))
 
     if (trackJson.partialFile) {

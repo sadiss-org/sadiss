@@ -132,7 +132,7 @@ for (const version of SUPPORTED_PROTOCOL_VERSIONS) {
         expect(announced).toBeLessThan(sequence.findIndex((message) => message.chunk))
 
         expect(Object.keys(envelope).sort()).toEqual(['chunk', 'startTime', 'ttsRate', 'waveform'])
-        expect(envelope).toMatchObject({ startTime: expect.any(Number), waveform: 'sine', ttsRate: '1.0' })
+        expect(envelope).toMatchObject({ startTime: expect.any(Number), waveform: 'sine', ttsRate: 1 })
 
         // Choir mode, registered as choir id 0: the partial written for that voice.
         expect(envelope.chunk.partials).toEqual([

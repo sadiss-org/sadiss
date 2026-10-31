@@ -4,5 +4,5 @@ import { TrackMode } from './TrackMode'
 export interface TrackSettings {
   mode: TrackMode
   waveform: OscillatorType
-  ttsRate: string
+  ttsRate: number
 }

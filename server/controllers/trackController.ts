@@ -32,6 +32,8 @@ const uuid = require('uuid')
 
 const Track = mongoose.model('Track', trackSchema)
 
+const ttsRateMessage = 'TTS rate must be a number from 0.2 to 1.5.'
+
 export const handleLoadTrackForPlayback = async (req: Request, res: Response, next: NextFunction) => {
   const { trackId, performanceId } = req.body
 
@@ -220,6 +222,10 @@ const validateInputsForUpload = (req: Request) => {
     return 'No waveform provided.'
   }
 
+  if (new Track({ ttsRate: req.body.ttsRate }).validateSync(['ttsRate'])) {
+    return ttsRateMessage
+  }
+
   return null
 }
 
@@ -292,7 +298,9 @@ export const editTrack = async (req: Request, res: Response) => {
     track.set(patch)
 
     track.save((err, updatedTrack) => {
-      if (err) {
+      if (err instanceof mongoose.Error.ValidationError && err.errors.ttsRate) {
+        res.status(400).send({ error: ttsRateMessage })
+      } else if (err) {
         res.status(500).send({ error: err.message })
       } else {
         res.json(updatedTrack)

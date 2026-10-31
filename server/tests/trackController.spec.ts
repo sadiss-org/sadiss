@@ -159,6 +159,26 @@ describe('trackController test', () => {
         .field('mode', 'choir')
         .expect(400)
     })
+
+    const createWithTtsRate = (ttsRate: string) =>
+      agent
+        .post('/api/track/create')
+        .attach('files', 'tests/testFiles/testPartialFile.txt', 'partialfile_testPartialFile')
+        .field('name', 'test track')
+        .field('mode', 'choir')
+        .field('waveform', 'sine')
+        .field('ttsRate', ttsRate)
+
+    it('should store the TTS rate as a number rounded to one decimal', async () => {
+      expect((await createWithTtsRate('1.0').expect(201)).body.ttsRate).toBe(1)
+      expect((await createWithTtsRate('0.30000000000000004').expect(201)).body.ttsRate).toBe(0.3)
+    })
+
+    it('should not create track if the TTS rate is not a number or outside 0.2 to 1.5', async () => {
+      await createWithTtsRate('fast').expect(400)
+      await createWithTtsRate('0.1').expect(400)
+      await createWithTtsRate('1.7').expect(400)
+    })
   })
 
   describe('POST /api/track/edit/:id', () => {
@@ -290,7 +310,13 @@ describe('trackController test', () => {
       expect(resEdit.body.mode).toBe('nonChoir')
       expect(resEdit.body.waveform).toBe('square')
       expect(resEdit.body.isPublic).toBe(false)
-      expect(resEdit.body.ttsRate).toBe('0.5')
+      expect(resEdit.body.ttsRate).toBe(0.5)
+    })
+
+    it('should not edit track if the TTS rate is not a number or outside 0.2 to 1.5', async () => {
+      const track = await createTestTrack('tts')
+      await agent.post(`/api/track/edit/${track._id}`).field('ttsRate', 'fast').expect(400)
+      await agent.post(`/api/track/edit/${track._id}`).field('ttsRate', '1.7').expect(400)
     })
 
     // TODO: This test times out most of the time. I've also seen it pass.

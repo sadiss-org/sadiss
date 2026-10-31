@@ -21,7 +21,7 @@ const CHUNK_MS = 1000
 const settings = (overrides: Partial<TrackSettings> = {}): TrackSettings => ({
   mode: 'choir',
   waveform: 'sine',
-  ttsRate: '1',
+  ttsRate: 1,
   ...overrides
 })
 
@@ -100,7 +100,7 @@ describe('what a playback session sends', () => {
       expect(soprano.received[1]).toEqual({
         startTime: 102,
         waveform: 'sine',
-        ttsRate: '1',
+        ttsRate: 1,
         chunk: { partials: [partial(0)] }
       })
       expect(alto.received[1].chunk).toEqual({ partials: [partial(1)] })

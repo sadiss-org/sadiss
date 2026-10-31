@@ -96,7 +96,7 @@ const load = (run: Run, frames: Frame[], mode: TrackMode) => {
   run.session = new PlaybackSession(run.performanceId, 'track-id', frames, 0, false, {
     mode,
     waveform: 'sine',
-    ttsRate: '1'
+    ttsRate: 1
   })
 }
 

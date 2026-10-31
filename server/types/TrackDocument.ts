@@ -14,7 +14,7 @@ export interface TrackDocument extends Document {
   ttsInstructions: string
   ttsLangs: string[]
   waveform: OscillatorType
-  ttsRate: string
+  ttsRate: number
   partialFile: {
     origName: string
     fileName: string
