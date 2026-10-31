@@ -1,4 +1,4 @@
-import { Schema, model } from 'mongoose'
+import { Schema, Types, model } from 'mongoose'
 import { SadissPerformanceDocument } from '../types'
 
 export const sadissPerformanceSchema = new Schema<SadissPerformanceDocument>({
@@ -10,5 +10,11 @@ export const sadissPerformanceSchema = new Schema<SadissPerformanceDocument>({
   deletedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 })
 sadissPerformanceSchema.set('timestamps', true)
+
+/** The performances an account may see: its own and every public one, unless deleted. */
+export const visibleTo = (userId: Types.ObjectId | string) => ({
+  $or: [{ isPublic: true }, { creator: userId }],
+  deleted: { $ne: true }
+})
 
 export const SadissPerformance = model<SadissPerformanceDocument>('SadissPerformance', sadissPerformanceSchema)

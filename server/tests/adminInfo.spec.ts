@@ -1,5 +1,4 @@
 import WebSocket from 'ws'
-import { Types } from 'mongoose'
 import { afterEach, describe, expect, it } from 'vitest'
 import { startWebSocketServer } from '../services/webSocketService'
 import { SadissWebSocketServer } from '../lib/SadissWebsocket'
@@ -84,7 +83,7 @@ describe('the updates an admin is pushed', () => {
   })
 
   it('keeps reporting the room to an admin that named a performance', async () => {
-    const admin = await watchAsAdmin(fastPushingServer(), new Types.ObjectId().toString())
+    const admin = await watchAsAdmin(fastPushingServer(), String(await createTestPerformance()))
 
     const updates = await admin.repeated()
 
@@ -101,7 +100,7 @@ describe('the updates an admin is pushed', () => {
    */
   describe('and where its performance has got to', () => {
     it('says nothing is playing when nothing is', async () => {
-      const admin = await watchAsAdmin(fastPushingServer(), new Types.ObjectId().toString())
+      const admin = await watchAsAdmin(fastPushingServer(), String(await createTestPerformance()))
 
       const updates = await admin.repeated()
 
@@ -111,7 +110,7 @@ describe('the updates an admin is pushed', () => {
     // Leaving the key out would mean a view showing a finished track has nothing
     // to correct it, which is the whole of #122.
     it('says so in every push, not only when the answer changes', async () => {
-      const admin = await watchAsAdmin(fastPushingServer(), new Types.ObjectId().toString())
+      const admin = await watchAsAdmin(fastPushingServer(), String(await createTestPerformance()))
 
       const updates = await admin.repeated()
 
@@ -200,7 +199,7 @@ describe('the updates an admin is pushed', () => {
 
   it('counts the devices that registered for the admin’s performance', async () => {
     const server = fastPushingServer()
-    const performanceId = new Types.ObjectId().toString()
+    const performanceId = String(await createTestPerformance())
     const port = (server.address() as WebSocket.AddressInfo).port
 
     const device = new WebSocket(`ws://localhost:${port}/`)

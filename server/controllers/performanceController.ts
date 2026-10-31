@@ -1,6 +1,6 @@
 import { Response, Request } from 'express'
 import { isValidObjectId } from 'mongoose'
-import { SadissPerformance } from '../models/sadissPerformance'
+import { SadissPerformance, visibleTo } from '../models/sadissPerformance'
 import { User } from '../models/user'
 import { TrackPerformance } from '../models'
 
@@ -18,11 +18,7 @@ export const getPerformances = async (req: Request, res: Response) => {
   }
 
   try {
-    // Get all performances that are public or owned by the user
-    const performances = await SadissPerformance.find(
-      { $or: [{ isPublic: true }, { creator: req.user?._id }], deleted: { $ne: true } },
-      '_id name creator isPublic'
-    )
+    const performances = await SadissPerformance.find(visibleTo(req.user!._id), '_id name creator isPublic')
       .populate('creator', 'username')
       .lean<PerformanceWithTrackCount[]>()
 

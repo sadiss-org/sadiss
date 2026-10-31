@@ -8,6 +8,8 @@ import { v4 as uuidv4 } from 'uuid'
 import { SadissWebSocketServer, SadissWebSocket } from '../lib/SadissWebsocket'
 import { AdminRegistrationMessage, readInboundMessage } from '../lib/inboundMessage'
 import { authenticatedUserId } from '../lib/adminAuth'
+import { SadissPerformance, visibleTo } from '../models/sadissPerformance'
+import { isValidObjectId } from 'mongoose'
 import {
   DEFAULT_TICK_MS,
   LIMITS_FOR_A_QUIET_PEER,
@@ -89,7 +91,7 @@ const handleMessage = (wss: SadissWebSocketServer, client: SadissWebSocket) => (
       measurementService.handleMeasure(client, parsed)
       break
     case 'isAdmin':
-      registerAdmin(wss, client, parsed)
+      void registerAdmin(wss, client, parsed)
       break
   }
 }
@@ -113,11 +115,21 @@ const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) 
  * What an admin is given is the state of the room: how many devices are
  * connected, in which voices, and where a running track has got to. That is not
  * public, and the port this arrives on is, so a connection that opened without a
- * login is not made an admin.
+ * login is not made an admin, and one that names a performance follows it only
+ * if that account may see it in its performance list.
  */
-const registerAdmin = (wss: SadissWebSocketServer, client: SadissWebSocket, registration: AdminRegistrationMessage) => {
+const registerAdmin = async (
+  wss: SadissWebSocketServer,
+  client: SadissWebSocket,
+  registration: AdminRegistrationMessage
+) => {
   if (!client.userId) {
     logger.warn(`Refused admin registration from client ${client.id}: the connection carried no valid login`)
+    return
+  }
+
+  if (registration.performanceId && !(await mayFollow(client.userId, registration.performanceId))) {
+    logger.warn(`Refused admin registration from client ${client.id}: performance ${registration.performanceId} is not visible to it`)
     return
   }
 
@@ -129,6 +141,18 @@ const registerAdmin = (wss: SadissWebSocketServer, client: SadissWebSocket, regi
   }
 
   client.send(JSON.stringify(createAdminInfoMessage(wss, registration.performanceId)))
+}
+
+/** Refuses when the lookup fails: an operator without a progress bar is better than a stranger with one. */
+const mayFollow = async (userId: string, performanceId: string) => {
+  if (!isValidObjectId(performanceId)) return false
+
+  try {
+    return !!(await SadissPerformance.exists({ _id: performanceId, ...visibleTo(userId) }))
+  } catch (err) {
+    logger.error(`Failed checking whether performance ${performanceId} is visible to ${userId}:`, err)
+    return false
+  }
 }
 
 const handleClose = (client: SadissWebSocket) => () => {

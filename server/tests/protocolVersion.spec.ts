@@ -1,5 +1,4 @@
 import WebSocket from 'ws'
-import { Types } from 'mongoose'
 import { describe, it, expect } from 'vitest'
 import { agent, authCookie } from './setupTests'
 import { createTestPerformance, createTestTrack } from './testUtils'
@@ -93,7 +92,7 @@ describe('protocol version in the client handshake', () => {
   })
 
   it('reports the protocol version of every connected client to admins', { timeout: 20000 }, async () => {
-    const performanceId = new Types.ObjectId().toString()
+    const performanceId = String(await createTestPerformance())
 
     const legacy = await connectClient({ clientId: 0, ttsLang, performanceId })
     const current = await connectClient({ clientId: 1, ttsLang, performanceId, protocolVersion: 2 })

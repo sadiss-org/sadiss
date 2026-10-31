@@ -45,10 +45,10 @@ export const createTestTrack = async (trackType: 'partials' | 'tts' | 'partialsA
   return resCreate.body
 }
 
-export const createTestPerformance = async () => {
+export const createTestPerformance = async (isPublic = true) => {
   const testPerformance = {
     name: 'test performance',
-    isPublic: true
+    isPublic
   }
 
   const resCreate: { body: { _id: Types.ObjectId } } = await agent
