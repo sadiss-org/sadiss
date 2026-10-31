@@ -17,7 +17,8 @@ dotenv.config({ path: '.env.test' })
 
 export const agent = request.agent(app)
 
-export let mockUser: any
+/** The logged-in test account. `password` is the plain text used to log in. */
+export let mockUser: { id: string; username: string; email: string; password: string }
 
 /** The logged-in cookie, for opening an authenticated websocket. */
 export let authCookie = ''
