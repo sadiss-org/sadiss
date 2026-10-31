@@ -5,6 +5,7 @@ import { useClockMeasurement } from './useClockMeasurement'
 import { buildClientInfoMessage } from './protocol'
 import { Capacitor } from '@capacitor/core'
 import { createResilientSocket } from './resilientSocket'
+import { iosSpeechRate } from './iosSpeechRate'
 
 const { handleChunkData, setOffset, stopPlayback, setStartTime, setTrackSettings } = usePlayer()
 const measurement = useClockMeasurement()
@@ -98,7 +99,7 @@ const handleMessage = (raw: string) => {
   let ttsRate = data.ttsRate
 
   if (Capacitor.getPlatform() === 'ios') {
-    ttsRate = ttsRateCorrection(ttsRate)
+    ttsRate = iosSpeechRate(ttsRate)
   }
 
   setTrackSettings(data.waveform, ttsRate)
@@ -107,25 +108,4 @@ const handleMessage = (raw: string) => {
   if (data.chunk && Object.keys(data.chunk).length) {
     handleChunkData(data.chunk)
   }
-}
-
-const ttsRateCorrection = (ttsRate: number) => {
-  const ttsRateLookupTable = {
-    0.2: 0.15,
-    0.3: 0.2,
-    0.4: 0.3,
-    0.5: 0.5,
-    0.6: 0.6,
-    0.7: 0.8,
-    0.8: 0.92,
-    0.9: 1.05,
-    1.0: 1.06,
-    1.1: 1.07,
-    1.2: 1.08,
-    1.3: 1.1,
-    1.4: 1.12,
-    1.5: 1.15
-  }
-
-  return ttsRateLookupTable[ttsRate as keyof typeof ttsRateLookupTable] || ttsRate
 }
