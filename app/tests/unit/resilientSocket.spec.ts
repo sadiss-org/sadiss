@@ -15,7 +15,7 @@ const connect = (silenceLimitMs = () => SILENCE_LIMIT_MS) => {
   const received: string[] = []
   const liveness: boolean[] = []
 
-  createResilientSocket({
+  const socket = createResilientSocket({
     url: 'wss://example/ws/',
     onOpen: (send) => send('hello'),
     onMessage: (data) => received.push(data),
@@ -24,7 +24,7 @@ const connect = (silenceLimitMs = () => SILENCE_LIMIT_MS) => {
     WebSocketImpl: FakeWebSocket as unknown as typeof WebSocket
   })
 
-  return { received, liveness }
+  return { received, liveness, socket }
 }
 
 describe('a socket that keeps itself connected', () => {
@@ -193,6 +193,51 @@ describe('a socket that keeps itself connected', () => {
     vi.advanceTimersByTime(reconnectDelay(0, () => 1))
 
     expect(latest().createdAt - droppedAt).toBeLessThanOrEqual(reconnectDelay(0, () => 1))
+  })
+})
+
+describe('a socket that is closed', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    FakeWebSocket.opened = []
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('closes its connection and does not open another', () => {
+    const { socket } = connect()
+    latest().open()
+
+    socket.close()
+    vi.advanceTimersByTime(SILENCE_LIMIT_MS + LONGEST_RECONNECT_MS)
+
+    expect(latest().closed).toBe(true)
+    expect(FakeWebSocket.opened).toHaveLength(1)
+  })
+
+  it('does not open another when it is closed while waiting to reconnect', () => {
+    const { socket } = connect()
+    latest().fail()
+
+    socket.close()
+    vi.advanceTimersByTime(LONGEST_RECONNECT_MS)
+
+    expect(FakeWebSocket.opened).toHaveLength(1)
+  })
+
+  it('passes on nothing more and stops counting as live', () => {
+    const { socket, received, liveness } = connect()
+    const first = latest()
+    first.open()
+    first.receive('before')
+
+    socket.close()
+    first.receive('after')
+
+    expect(received).toEqual(['before'])
+    expect(liveness).toEqual([true, false])
   })
 })
 

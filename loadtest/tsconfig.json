@@ -13,7 +13,8 @@
     "types": ["node"],
     "lib": ["es2022", "dom"],
     "paths": {
-      "@/*": ["../app/src/*"]
+      "@/*": ["../app/src/*"],
+      "@server/*": ["../server/*"]
     }
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]

@@ -1,7 +1,11 @@
 export interface TrackShape {
-  /** Length of the track in seconds, which is also its number of chunks. */
+  /** Length of the track in seconds. */
   seconds: number
-  /** How many partials sound in every frame; this sets the size of each chunk. */
+  /**
+   * How many partials sound in every frame. In nonChoir mode the server shares
+   * a frame's partials out over the connected phones, at most 16 each, so this
+   * and the number of phones together set how much each phone is sent.
+   */
   partialsPerFrame: number
 }
 

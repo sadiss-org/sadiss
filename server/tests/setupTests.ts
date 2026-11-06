@@ -6,7 +6,7 @@ import fs from 'fs'
 import mongoose from 'mongoose'
 import { trackSchema } from '../models/track'
 import { User } from '../models/user'
-import bcrypt from 'bcryptjs'
+import { hashPassword } from '../services/authService'
 import path from 'path'
 import { app, server, wss } from '../server'
 import { beforeAll, beforeEach, afterEach, afterAll, vi } from 'vitest'
@@ -53,7 +53,7 @@ beforeAll(async () => {
   const createdUser = await User.create({
     username: mockUserDetails.username,
     email: mockUserDetails.email,
-    password: await bcrypt.hash(mockUserDetails.password, 10)
+    password: await hashPassword(mockUserDetails.password)
   })
 
   mockUser = {
