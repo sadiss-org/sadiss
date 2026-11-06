@@ -1,6 +1,7 @@
 import { reactive, ref } from 'vue'
 import { TextToSpeech } from '@capacitor-community/text-to-speech'
 import { PartialChunk, OscillatorObject, Breakpoint } from '../types/types'
+import { useMainStore } from '@/stores/MainStore'
 
 const BREAKPOINT_LENGTH = 0.01 // in seconds
 const AMP_MIN_VALUE = 0.000001
@@ -10,7 +11,6 @@ let ctx: AudioContext
 let offset: number
 let motion: { pos: number } = reactive({ pos: -1 })
 let outputLatencyOffset = 0
-let ttsLanguage: string
 let waveform: OscillatorType
 let ttsRate = 1
 let keepAlive: HTMLAudioElement | undefined
@@ -230,16 +230,14 @@ export function usePlayer() {
   const speak = async (text: string) => {
     await TextToSpeech.speak({
       text: text,
-      lang: ttsLanguage,
+      // An empty iso means the QR code offered no language; the plugin then
+      // uses its own default.
+      lang: useMainStore().selectedLanguage.iso || undefined,
       rate: ttsRate,
       pitch: 1.0,
       volume: 1.0,
       category: 'playback'
     })
-  }
-
-  const setTtsLanguage = (lang: string) => {
-    ttsLanguage = lang
   }
 
   const setMotionRef = (motionRef: { pos: number }) => (motion = motionRef)
@@ -257,7 +255,6 @@ export function usePlayer() {
     handleChunkData,
     preparePlaybackAndTts,
     setStartTime,
-    setTtsLanguage,
     setMotionRef,
     setTrackSettings,
     stopPlayback,
