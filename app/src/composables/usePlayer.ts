@@ -15,6 +15,32 @@ let waveform: OscillatorType
 let ttsRate = 1
 let keepAlive: HTMLAudioElement | undefined
 
+/** Whether the phone has a voice for a language, asked once per language. */
+const voiceAvailable = new Map<string, Promise<boolean>>()
+
+/**
+ * The language to speak a phrase in: the one the QR code offered, or undefined
+ * for the plugin's own default voice. A phone without a voice for the offered
+ * language gets the default voice too, because a phrase read with the wrong
+ * accent is better than one that is not heard at all. If the check itself
+ * fails, the offered language is used, as it would be without the check.
+ */
+const voiceLanguage = async (): Promise<string | undefined> => {
+  const iso = useMainStore().selectedLanguage.iso
+  if (!iso) return undefined
+
+  if (!voiceAvailable.has(iso)) {
+    voiceAvailable.set(
+      iso,
+      TextToSpeech.isLanguageSupported({ lang: iso }).then(
+        ({ supported }) => supported,
+        () => true
+      )
+    )
+  }
+  return (await voiceAvailable.get(iso)) ? iso : undefined
+}
+
 /**
  * One second of 8 kHz mono 16-bit silence as a WAV blob URL.
  */
@@ -230,9 +256,7 @@ export function usePlayer() {
   const speak = async (text: string) => {
     await TextToSpeech.speak({
       text: text,
-      // An empty iso means the QR code offered no language; the plugin then
-      // uses its own default.
-      lang: useMainStore().selectedLanguage.iso || undefined,
+      lang: await voiceLanguage(),
       rate: ttsRate,
       pitch: 1.0,
       volume: 1.0,

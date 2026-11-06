@@ -1,8 +1,11 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { useBarcodeScanner } from '@/composables/useBarcodeScanner'
 
-const { speak } = vi.hoisted(() => ({ speak: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@capacitor-community/text-to-speech', () => ({ TextToSpeech: { speak } }))
+const { speak, isLanguageSupported } = vi.hoisted(() => ({
+  speak: vi.fn().mockResolvedValue(undefined),
+  isLanguageSupported: vi.fn()
+}))
+vi.mock('@capacitor-community/text-to-speech', () => ({ TextToSpeech: { speak, isLanguageSupported } }))
 
 class FakeAudioContext {
   currentTime = 1000
@@ -25,6 +28,7 @@ describe('the language a TTS phrase is spoken in', () => {
     vi.stubGlobal('Audio', FakeAudio)
     setActivePinia(createPinia())
     speak.mockClear()
+    isLanguageSupported.mockReset().mockResolvedValue({ supported: true })
   })
 
   afterEach(() => {
@@ -33,7 +37,11 @@ describe('the language a TTS phrase is spoken in', () => {
     vi.resetModules()
   })
 
-  const scanAndSpeak = async (tts: { iso: string; lang: string }[] | undefined, pick?: { iso: string; lang: string }) => {
+  const scanAndSpeak = async (
+    tts: { iso: string; lang: string }[] | undefined,
+    pick?: { iso: string; lang: string },
+    phrases = 1
+  ) => {
     const { usePlayer } = await import('@/composables/usePlayer')
     const { useMainStore } = await import('@/stores/MainStore')
     const player = usePlayer()
@@ -44,8 +52,10 @@ describe('the language a TTS phrase is spoken in', () => {
     await player.preparePlaybackAndTts()
 
     player.setStartTime(0)
-    player.handleChunkData({ partials: [], ttsInstructions: { time: 0, phrase: 'Guten Abend.' } })
-    await vi.advanceTimersByTimeAsync(200)
+    for (let i = 0; i < phrases; i++) {
+      player.handleChunkData({ partials: [], ttsInstructions: { time: 0, phrase: 'Guten Abend.' } })
+      await vi.advanceTimersByTimeAsync(200)
+    }
   }
 
   it('is the only language of a QR code that offers one', async () => {
@@ -62,5 +72,23 @@ describe('the language a TTS phrase is spoken in', () => {
   it("is left to the plugin's default when the QR code offers no language", async () => {
     await scanAndSpeak(undefined)
     expect(phraseLanguages()).toEqual([undefined])
+  })
+
+  it("is the phone's default voice when the phone has no voice for the language, so the phrase is still heard", async () => {
+    isLanguageSupported.mockResolvedValue({ supported: false })
+    await scanAndSpeak([{ iso: 'de-DE', lang: 'Deutsch' }])
+    expect(phraseLanguages()).toEqual([undefined])
+  })
+
+  it('is the language itself when checking for a voice fails, so a broken check does not change the voice', async () => {
+    isLanguageSupported.mockRejectedValue(new Error('not implemented'))
+    await scanAndSpeak([{ iso: 'de-DE', lang: 'Deutsch' }])
+    expect(phraseLanguages()).toEqual(['de-DE'])
+  })
+
+  it('is checked for a voice once per language, not before every phrase', async () => {
+    await scanAndSpeak([{ iso: 'de-DE', lang: 'Deutsch' }], undefined, 3)
+    expect(phraseLanguages()).toEqual(['de-DE', 'de-DE', 'de-DE'])
+    expect(isLanguageSupported).toHaveBeenCalledTimes(1)
   })
 })
