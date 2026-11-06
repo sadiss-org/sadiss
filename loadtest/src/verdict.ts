@@ -1,8 +1,13 @@
 import { RunResult } from './results'
 import { THRESHOLDS } from './thresholds'
 
-/** A percentile a threshold can read from a figure that holds several: `p1` is the 1st percentile, `p99` the 99th. */
-export type Statistic = 'p1' | 'p99'
+/** The fields of an object that hold a number, or a number the run may not have measured. */
+type NumberFields<T> = { [K in keyof T]-?: T[K] extends number | null ? K : never }[keyof T]
+
+/** A value a threshold can read from a figure that holds several, such as `p1` for the 1st percentile or `median`. */
+export type Statistic = {
+  [F in keyof RunResult]: RunResult[F] extends number ? never : NumberFields<RunResult[F]>
+}[keyof RunResult]
 
 /**
  * Which value of a run a threshold reads: a figure that is a plain number, or
@@ -11,7 +16,7 @@ export type Statistic = 'p1' | 'p99'
 type Reading = {
   [F in keyof RunResult]: RunResult[F] extends number
     ? { figure: F; statistic?: undefined }
-    : { figure: F; statistic: Extract<keyof RunResult[F], Statistic> }
+    : { figure: F; statistic: NumberFields<RunResult[F]> }
 }[keyof RunResult]
 
 /**
@@ -42,10 +47,10 @@ const read = (result: RunResult, threshold: Threshold): number | null => {
 
 /**
  * Judges a run by its thresholds. A value equal to its limit passes; a value the
- * run did not measure fails, since with two or more phones that means the
- * server delivered nothing to measure. A run is invalid when any check whose
- * consequence is `invalid` failed, whatever the other checks say; otherwise it
- * fails when any check failed.
+ * run did not measure fails, since the run did not show that the threshold
+ * holds. A run is invalid when any check whose consequence is `invalid`
+ * failed, whatever the other checks say; otherwise it fails when any check
+ * failed.
  */
 export const judge = (result: RunResult, thresholds: readonly Threshold[] = THRESHOLDS): Verdict => {
   const checks = thresholds.map((threshold) => {

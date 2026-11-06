@@ -104,13 +104,17 @@ describe('the verdict on a run', () => {
   it('judges by the thresholds it is given instead of the default ones', () => {
     const strict: Threshold[] = [
       { figure: 'arrivalLeadMs', statistic: 'p1', bound: 'atLeast', limit: 970, consequence: 'fail' },
-      { figure: 'connects', bound: 'atMost', limit: 10, consequence: 'fail' }
+      { figure: 'connects', bound: 'atMost', limit: 10, consequence: 'fail' },
+      { figure: 'roundTripMs', statistic: 'median', bound: 'atMost', limit: 2, consequence: 'fail' },
+      { figure: 'generatorDelayMs', statistic: 'max', bound: 'atMost', limit: 3, consequence: 'invalid' }
     ]
     const verdict = judge(healthy(), strict)
-    expect(verdict.outcome).toBe('fail')
+    expect(verdict.outcome).toBe('invalid')
     expect(verdict.checks).toEqual([
       { threshold: strict[0], value: 965, passed: false },
-      { threshold: strict[1], value: 10, passed: true }
+      { threshold: strict[1], value: 10, passed: true },
+      { threshold: strict[2], value: 2, passed: true },
+      { threshold: strict[3], value: 4, passed: false }
     ])
   })
 })
