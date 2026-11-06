@@ -22,7 +22,13 @@ const line = (label: string, summary: Summary, unit = ms) =>
   `${label.padEnd(28)} median ${unit(summary.median)}, p95 ${unit(summary.p95)}, p99 ${unit(summary.p99)}, min ${unit(summary.min)}, max ${unit(summary.max)} (${summary.count} values)`
 const count = (value: number | null) => (value === null ? '-' : String(Math.round(value)))
 
-const result = await runFixed(options, { email, password })
+let result
+try {
+  result = await runFixed(options, { email, password })
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error)
+  process.exit(1)
+}
 
 console.log(
   [

@@ -1,7 +1,7 @@
 import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { distancesFromMedian, summarize, Summary } from './stats'
 import { TrackShape } from './track'
-import { VirtualPhone } from './virtualPhone'
+import { Audience } from './audience'
 
 export interface RunResult {
   phones: number
@@ -28,13 +28,17 @@ const SAMPLE_EVERY_MS = 1000
 const DELAY_RESOLUTION_MS = 10
 
 /**
- * Watches a run while the track plays: the phones' clock offsets every second,
- * and the load generator's own event loop.
+ * Watches an audience while a track plays: every second the clock offsets of
+ * the phones in it at that moment, including phones that join later, and
+ * throughout the load generator's own event loop.
  */
-export const watch = (phones: VirtualPhone[]) => {
-  const roundTripsAtStart = phones.map((phone) => phone.roundTripsMs.length)
+export const watch = (audience: Audience) => {
+  const roundTripsAtStart = audience.phones.map((phone) => phone.roundTripsMs.length)
   const distances: number[] = []
-  const sampler = setInterval(() => distances.push(...distancesFromMedian(phones.map((phone) => phone.offsetMs()))), SAMPLE_EVERY_MS)
+  const sampler = setInterval(
+    () => distances.push(...distancesFromMedian(audience.phones.map((phone) => phone.offsetMs()))),
+    SAMPLE_EVERY_MS
+  )
   const generatorDelay = monitorEventLoopDelay({ resolution: DELAY_RESOLUTION_MS })
   generatorDelay.enable()
 
@@ -42,11 +46,18 @@ export const watch = (phones: VirtualPhone[]) => {
   // loop reads as the resolution itself; only what is above it is delay.
   const delayMs = (ns: number) => Number(Math.max(0, ns / 1e6 - DELAY_RESOLUTION_MS).toFixed(3))
 
+  const stop = () => {
+    clearInterval(sampler)
+    generatorDelay.disable()
+  }
+
   return {
+    /** Stops watching without a result, such as when the run failed. */
+    stop,
     /** Stops watching and sums up what every phone saw. */
     finish: (track: TrackShape, chunkCount: number): RunResult => {
-      clearInterval(sampler)
-      generatorDelay.disable()
+      stop()
+      const phones = audience.phones
       const arrivals = phones.flatMap((phone) => phone.arrivals)
       const missingChunks = phones.reduce((sum, phone) => {
         const received = new Set(phone.arrivals.map((arrival) => arrival.chunk))

@@ -15,10 +15,12 @@ export interface DeviceConnectionOptions {
   url: string
   /** Who this phone is, read each time a connection opens. */
   clientInfo: () => Omit<ClientInfoMessage, 'message' | 'protocolVersion'>
-  clockSync: Pick<ClockSync, 'start' | 'handleMessage' | 'intervalMs'>
+  clockSync: Pick<ClockSync, 'start' | 'handleMessage' | 'intervalMs' | 'stop'>
   /** Every message that is not about the clock: start, stop and chunks. */
   onPlayback: (message: Record<string, unknown>) => void
   onLiveChange: (live: boolean) => void
+  /** Called with every message as it arrives, before anything is done with it. */
+  log?: (raw: string) => void
   WebSocketImpl?: typeof WebSocket
 }
 
@@ -27,10 +29,10 @@ export interface DeviceConnectionOptions {
  * keeps itself connected, starts the clock sync and introduces the phone each
  * time it opens, gives clock messages to the clock sync and everything else to
  * playback. It knows nothing about Vue or the device, so the load test's
- * virtual phones connect through it too.
+ * virtual phones connect through it too. Closing it also stops the clock sync.
  */
-export const connectDevice = ({ url, clientInfo, clockSync, onPlayback, onLiveChange, WebSocketImpl }: DeviceConnectionOptions) =>
-  createResilientSocket({
+export const connectDevice = ({ url, clientInfo, clockSync, onPlayback, onLiveChange, log, WebSocketImpl }: DeviceConnectionOptions) => {
+  const socket = createResilientSocket({
     url,
     onOpen: (send) => {
       clockSync.start((message) => send(JSON.stringify(message)))
@@ -38,6 +40,7 @@ export const connectDevice = ({ url, clientInfo, clockSync, onPlayback, onLiveCh
     },
     onMessage: (raw) => {
       if (!raw) return
+      log?.(raw)
       let message: unknown
       try {
         message = JSON.parse(raw)
@@ -53,3 +56,12 @@ export const connectDevice = ({ url, clientInfo, clockSync, onPlayback, onLiveCh
     silenceLimitMs: () => REPLIES_MISSED_BEFORE_GIVING_UP * (clockSync.intervalMs() || ASSUMED_MEASURE_INTERVAL_MS),
     WebSocketImpl
   })
+
+  return {
+    /** Disconnects for good and stops the clock sync's pings. */
+    close: () => {
+      socket.close()
+      clockSync.stop()
+    }
+  }
+}

@@ -35,6 +35,7 @@ export function useWebsocketConnection() {
       }),
       clockSync: measurement,
       onPlayback: handlePlayback,
+      log: (raw) => console.log(raw),
       // Playback is left alone when the connection goes: what is already
       // scheduled plays out while the next one is found.
       onLiveChange: (live) => (isRegistered.value = live)

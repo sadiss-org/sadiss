@@ -16,7 +16,8 @@ const connect = (intervalMs = 3000) => {
       send({ message: 'measure', t0: 1 })
     }),
     handleMessage: vi.fn((payload: { message?: unknown }) => payload.message === 'measureResponse'),
-    intervalMs: () => intervalMs
+    intervalMs: () => intervalMs,
+    stop: vi.fn()
   }
   const connection = connectDevice({
     url: 'wss://example/ws/',
@@ -91,13 +92,14 @@ describe('the connection a phone keeps to the server', () => {
     expect(FakeWebSocket.opened).toHaveLength(2)
   })
 
-  it('stops for good when closed', () => {
-    const { connection } = connect()
+  it('stops for good when closed, clock pings included', () => {
+    const { connection, clockSync } = connect()
     latestSocket().open()
 
     connection.close()
     vi.advanceTimersByTime(60000)
 
     expect(FakeWebSocket.opened).toHaveLength(1)
+    expect(clockSync.stop).toHaveBeenCalled()
   })
 })

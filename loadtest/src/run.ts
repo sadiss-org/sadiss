@@ -1,10 +1,11 @@
 import { setTimeout as sleep } from 'node:timers/promises'
-import { join } from './audience'
+import { CHUNK_SECONDS } from '@server/types/ChunkEnvelope'
+import { createAudience, joinGradually } from './audience'
 import { Options } from './options'
 import { RunResult, watch } from './results'
 import { createTarget } from './target'
 
-/** How long after a chunk is due it may still be on its way; chunks are one second of the track each. */
+/** How long after the last chunk is due it may still be on its way. */
 const TAIL_MS = 4000
 
 /**
@@ -15,24 +16,29 @@ export const runFixed = async (options: Options, admin: { email: string; passwor
   const target = await createTarget(options.apiUrl, admin.email, admin.password)
   const performance = await target.prepare(options.track, `loadtest ${new Date().toISOString()}`)
 
-  const audience = await join(options.phones, options.joinOverMs, () => ({
-    wsUrl: options.wsUrl,
-    performanceId: performance.id,
-    choirId: 0,
-    ttsLang: { iso: 'en-US', lang: 'English' }
-  }))
+  const audience = createAudience()
+  let watching: ReturnType<typeof watch> | undefined
   try {
+    await joinGradually(audience, options.phones, options.joinOverMs, () => ({
+      wsUrl: options.wsUrl,
+      performanceId: performance.id,
+      choirId: 0,
+      ttsLang: { iso: 'en-US', lang: 'English' }
+    }))
     await sleep(options.settleMs)
     if (audience.phones.every((phone) => phone.connects === 0)) {
       throw new Error(`No phone could connect to ${options.wsUrl}.`)
     }
 
-    const watching = watch(audience.phones)
+    watching = watch(audience)
     await performance.start()
-    await sleep(performance.chunkCount * 1000 + TAIL_MS)
+    await sleep(performance.chunkCount * CHUNK_SECONDS * 1000 + TAIL_MS)
     await performance.stop()
-    return watching.finish(options.track, performance.chunkCount)
+    const result = watching.finish(options.track, performance.chunkCount)
+    watching = undefined
+    return result
   } finally {
+    watching?.stop()
     audience.leave()
   }
 }

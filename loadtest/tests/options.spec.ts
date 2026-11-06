@@ -27,7 +27,9 @@ describe('the command line', () => {
     ['--seconds', '2.5'],
     ['--partials', '0'],
     ['--join-over', '-1'],
-    ['--settle', 'x']
+    ['--settle', 'x'],
+    ['--settle', ''],
+    ['--join-over', ' ']
   ])('refuses %s %s instead of running a test that cannot fail', (option, value) => {
     expect(() => parseOptions([option, value])).toThrow(option)
   })

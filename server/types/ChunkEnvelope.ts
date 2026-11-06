@@ -1,5 +1,8 @@
 import { PartialChunk } from './PartialChunk'
 
+/** How much of a track one chunk carries, in seconds; a session sends one chunk per this much time. */
+export const CHUNK_SECONDS = 1
+
 /** The audio and speech a device is given for one chunk. */
 export interface Chunk {
   partials?: PartialChunk[]

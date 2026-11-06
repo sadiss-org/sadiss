@@ -1,24 +1,32 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { PhoneOptions, startVirtualPhone, VirtualPhone } from './virtualPhone'
 
+/** The virtual phones in a performance. Phones can join at any time, before or during a track. */
 export interface Audience {
-  phones: VirtualPhone[]
+  /** Every phone that has joined so far, in the order they joined. */
+  readonly phones: readonly VirtualPhone[]
+  join(options: PhoneOptions): VirtualPhone
   /** Disconnects every phone for good. */
   leave(): void
 }
 
-/**
- * Lets `count` virtual phones join a performance one after another, spread
- * evenly over `overMs`, and resolves once the last one has joined.
- */
-export const join = async (count: number, overMs: number, phoneFor: (index: number) => PhoneOptions): Promise<Audience> => {
+export const createAudience = (): Audience => {
   const phones: VirtualPhone[] = []
-  for (let index = 0; index < count; index++) {
-    phones.push(startVirtualPhone(phoneFor(index)))
-    await sleep(overMs / count)
-  }
   return {
     phones,
+    join: (options) => {
+      const phone = startVirtualPhone(options)
+      phones.push(phone)
+      return phone
+    },
     leave: () => phones.forEach((phone) => phone.close())
+  }
+}
+
+/** Lets `count` phones join one after another, spread evenly over `overMs`. */
+export const joinGradually = async (audience: Audience, count: number, overMs: number, phoneFor: (index: number) => PhoneOptions) => {
+  for (let index = 0; index < count; index++) {
+    audience.join(phoneFor(index))
+    await sleep(overMs / count)
   }
 }

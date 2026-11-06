@@ -13,7 +13,8 @@ export interface Options {
 }
 
 const number = (option: string, value: string, { atLeast, whole }: { atLeast: number; whole: boolean }) => {
-  const parsed = Number(value)
+  // Number('') is 0, so an empty value has to be refused before it is read.
+  const parsed = value.trim() === '' ? Number.NaN : Number(value)
   if (!Number.isFinite(parsed) || parsed < atLeast || (whole && !Number.isInteger(parsed))) {
     throw new Error(`--${option} must be ${whole ? 'a whole number' : 'a number'} of at least ${atLeast}, not "${value}".`)
   }

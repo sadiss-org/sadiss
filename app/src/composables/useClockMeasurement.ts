@@ -14,6 +14,5 @@ export function useClockMeasurement() {
       return sync.clock.posAt(performance.now())
     }
   })
-
-  return { start: sync.start, handleMessage: sync.handleMessage, intervalMs: sync.intervalMs }
+  return sync
 }
