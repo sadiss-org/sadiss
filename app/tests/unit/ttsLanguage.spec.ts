@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { useBarcodeScanner } from '@/composables/useBarcodeScanner'
 
-const speak = vi.fn().mockResolvedValue(undefined)
+const { speak } = vi.hoisted(() => ({ speak: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@capacitor-community/text-to-speech', () => ({ TextToSpeech: { speak } }))
 
 class FakeAudioContext {
@@ -48,7 +48,7 @@ describe('the language a TTS phrase is spoken in', () => {
     await vi.advanceTimersByTimeAsync(200)
   }
 
-  it('is the only language of a QR code that offers one, so no language page is shown', async () => {
+  it('is the only language of a QR code that offers one', async () => {
     await scanAndSpeak([{ iso: 'de-DE', lang: 'Deutsch' }])
     expect(phraseLanguages()).toEqual(['de-DE'])
   })
