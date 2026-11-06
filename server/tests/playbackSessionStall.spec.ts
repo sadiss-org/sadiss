@@ -57,7 +57,10 @@ const consecutive = (frames: number[]) => frames.every((frame, i) => i === 0 || 
 
 const playChunks = (count: number) => vi.advanceTimersByTime(count * CHUNK_MS)
 
-/** Blocks the event loop for `ms`: the clock moves on, no timer runs. */
+/**
+ * Makes the session's next timer fire `ms` late, as a blocked event loop does:
+ * the clock moves on and no timer runs in between.
+ */
 const stall = (ms: number) => vi.setSystemTime(Date.now() + ms)
 
 describe('a playback session that falls behind', () => {
@@ -69,9 +72,9 @@ describe('a playback session that falls behind', () => {
     vi.restoreAllMocks()
   })
 
-  const startPlaying = (frames: Frame[], loop = false) => {
+  const startPlaying = (frames: Frame[], loop = false, startAtChunk = 0) => {
     const phone = device()
-    const session = new PlaybackSession(PERFORMANCE_ID, 'track', frames, 0, loop, settings)
+    const session = new PlaybackSession(PERFORMANCE_ID, 'track', frames, startAtChunk, loop, settings)
     session.start(Date.now() / 1000, () => [phone.recipient])
     return { phone, session }
   }
@@ -124,5 +127,54 @@ describe('a playback session that falls behind', () => {
     expect(phone.frames()).toEqual([0, 1, 2])
     expect(phone.stopped()).toBe(true)
     expect(session.isRunning()).toBe(false)
+  })
+
+  it('skips by track position when the track starts part way in', () => {
+    const { phone } = startPlaying(track(12), false, 3)
+    playChunks(3)
+
+    stall(3500)
+    playChunks(1)
+
+    expect(phone.frames().slice(0, 4)).toEqual([3, 4, 5, 8])
+  })
+
+  it('skips by the round it is in once a looping track has gone round', () => {
+    const { phone } = startPlaying(track(4), true)
+    playChunks(5)
+
+    stall(3500)
+    playChunks(1)
+
+    expect(phone.frames().slice(0, 6)).toEqual([0, 1, 2, 3, 0, 3])
+  })
+
+  it('goes on at the chunk now due when a looping track stalls for longer than the whole track', () => {
+    const { phone, session } = startPlaying(track(4), true)
+    playChunks(3)
+
+    // Chunk n of the whole run sounds from n + 2 s to n + 3 s. The session wakes
+    // at 13.5 s, when run chunk 11 is sounding: the third round's chunk 3.
+    stall(9500)
+    playChunks(1)
+
+    expect(phone.frames().slice(0, 4)).toEqual([0, 1, 2, 3])
+    expect(session.progress()).toMatchObject({ chunkIndex: expect.any(Number), totalChunks: 4 })
+    const { chunkIndex } = session.progress() as { chunkIndex: number }
+    expect(chunkIndex).toBeLessThan(4)
+  })
+
+  it('keeps a chunk whose sound lies later than its place in the track', () => {
+    // A partials file with a gap: frame 3 holds sound from 8 s to 9 s.
+    const frames = track(10)
+    frames[3] = { partials: [{ ...partial(3), startTime: 8, endTime: 9 }], ttsInstructions: {} }
+    const { phone } = startPlaying(frames)
+    playChunks(3)
+
+    // Frame 3 sounds from 10 s to 11 s; the session wakes at 7.5 s.
+    stall(3500)
+    playChunks(1)
+
+    expect(phone.frames().slice(0, 4)).toEqual([0, 1, 2, 3])
   })
 })

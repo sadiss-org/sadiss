@@ -51,7 +51,7 @@ const audienceFor = (run: Run) => webSocketAudience(testWss(), String(run.perfor
  * which is how we simulate a client (dis)connecting mid-performance.
  */
 const drive = (run: Run, frameCount: number, betweenFrames?: (frameIndex: number) => void) => {
-  run.session!.start(0, audienceFor(run))
+  run.session!.start(Date.now() / 1000, audienceFor(run))
   for (let i = 0; i < frameCount; i++) {
     vi.advanceTimersByTime(1000)
     betweenFrames?.(i)
@@ -274,8 +274,8 @@ describe('partial distribution (characterization)', () => {
       createMockWsClient(performanceId, 0)
       loadNonChoir(run, [frame([0]), frame([0]), frame([0])])
 
-      const first = run.session!.start(0, audienceFor(run))
-      const second = run.session!.start(0, audienceFor(run))
+      const first = run.session!.start(Date.now() / 1000, audienceFor(run))
+      const second = run.session!.start(Date.now() / 1000, audienceFor(run))
 
       expect(first).toBe(true)
       expect(second).toBe(false)
