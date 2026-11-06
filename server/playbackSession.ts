@@ -13,6 +13,18 @@ const CHUNK_INTERVAL_MS = 1000
  */
 const LEAD_SECONDS = 2
 
+/**
+ * Until when, in seconds of track time, a frame has something to play: the end
+ * of its partials or the start of its latest phrase, and never before the end
+ * of its own second, so frames with nothing in them still pass one per second.
+ */
+const soundsUntil = (frame: Frame, index: number) =>
+  Math.max(
+    index + 1,
+    ...frame.partials.map((partial) => partial.endTime),
+    ...Object.values(frame.ttsInstructions ?? {}).map((instruction) => instruction.time)
+  )
+
 /** Where a performance has got to, as an admin is shown it. */
 export type PlaybackProgress =
   | { playing: false }
@@ -31,8 +43,8 @@ export class PlaybackSession {
   private running = false
   /**
    * The chunk this run last sent. Recorded rather than worked out from the clock,
-   * because a run that gives up on a drifting timer stops sending while the
-   * arithmetic would carry on.
+   * because a run that falls behind skips the chunks that are already over, so
+   * the time since the start does not say which chunk went out last.
    */
   private sentChunk = 0
   readonly performanceKey: string
@@ -112,7 +124,7 @@ export class PlaybackSession {
       const { messages, nextMap } = payloadsForChunk(
         currentFrame,
         devices,
-        actualStartTime + LEAD_SECONDS,
+        chunkDate(),
         this.settings,
         partialMap
       )
@@ -132,17 +144,17 @@ export class PlaybackSession {
         return
       }
 
+      const behindMs = Date.now() - expected
+      const skipped = skipChunksAlreadyOver()
+      if (skipped) {
+        expected += skipped * CHUNK_INTERVAL_MS
+        logger.warn(`Sending fell ${behindMs} ms behind; skipped ${skipped} chunks that were already over.`)
+      }
+
       const shouldContinue = handleTrackEnd()
       if (!shouldContinue) return
 
       const dt = Date.now() - expected
-      if (dt > CHUNK_INTERVAL_MS) {
-        logger.warn('Sending interval somehow broke. Stopping.')
-        this.running = false
-        reset()
-        return
-      }
-
       const devices = audienceNow()
 
       if (devices.length) {
@@ -156,6 +168,36 @@ export class PlaybackSession {
 
       expected += CHUNK_INTERVAL_MS
       setTimeout(step, Math.max(0, CHUNK_INTERVAL_MS - dt))
+    }
+
+    /** The date every chunk of the current round is sent with. */
+    const chunkDate = () => actualStartTime + LEAD_SECONDS
+
+    const atEnd = () => chunkIndex >= this.frames.length
+
+    /** On a looping track, moves a position past the end into the round it falls in. */
+    const wrapIntoRound = () => {
+      const length = this.frames.length
+      if (!this.loop || !length || !atEnd()) return
+      const rounds = Math.floor(chunkIndex / length)
+      actualStartTime += rounds * length
+      chunkIndex -= rounds * length
+    }
+
+    /**
+     * Moves past every chunk that has already finished sounding, and returns how
+     * many that was. A chunk that is late but still has sound ahead of it is
+     * kept: devices schedule it by its date, not by when it arrives, so they
+     * play what is left of it at the right moment.
+     */
+    const skipChunksAlreadyOver = () => {
+      let skipped = 0
+      while (!atEnd() && (chunkDate() + soundsUntil(this.frames[chunkIndex], chunkIndex)) * 1000 <= Date.now()) {
+        chunkIndex++
+        skipped++
+        wrapIntoRound()
+      }
+      return skipped
     }
 
     // Start
@@ -173,8 +215,7 @@ export class PlaybackSession {
       if (chunkIndex >= this.frames.length) {
         if (this.loop) {
           logger.info('No more chunks. Looping.')
-          actualStartTime += this.frames.length
-          chunkIndex = 0
+          wrapIntoRound()
           return true
         } else {
           logger.info('No more chunks. Stopping.')

@@ -66,6 +66,9 @@ describe('what a playback session sends', () => {
     // The global setup runs self-advancing timers; stepping chunk by chunk needs
     // the clock to move only when this test says so.
     vi.useFakeTimers()
+    // Sessions are started at 100 s below, and a start time is the server's own
+    // clock, so the clock reads 100 s when they start.
+    vi.setSystemTime(100 * 1000)
   })
 
   describe('in choir mode', () => {
