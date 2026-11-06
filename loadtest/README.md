@@ -7,7 +7,8 @@ Virtual phones that connect to a SADISS server the way the app does, play a gene
 - **Arrival before sound:** how long before its first sound each chunk reached each phone, by that phone's own estimate of the server clock. The server sends a chunk about one second ahead, so a healthy run reads a little under 1000 ms; a negative value means the chunk came too late to play on time.
 - **Clock offset off the median:** every second while the track plays, how far each phone's clock offset is from the median offset of all phones. All virtual phones of a run share one physical clock, so a perfect clock sync would give them identical offsets, and each distance is that phone's share of the sync's error. This holds only for virtual phones: real phones have clocks of their own, so their offsets differ for that reason alone.
 - **Round trips at track start:** how many clock measurements each phone had completed when the track started. The app's clock estimate uses the last 20, one every 3 s, so it is settled about a minute after a phone joins.
-- **Measurement round trip**, **missing chunks** (counted per phone), **chunks before a clock** (received before the phone had any clock estimate), and **connects / drops**.
+- **Measurement round trip** (every clock measurement from joining to the end of the track), **missing chunks** (counted per phone), **chunks before a clock** (received before the phone had any clock estimate), and **connects** (every connection the phones opened, from joining to the end of the track).
+- **Drops during the track** and **drops before the track:** how often a phone lost a live connection while the track played, and before it started, while the phones joined and settled.
 - **Generator event loop:** how far the load generator's own event loop fell behind while the track played. When this is high, the generator, not the server, was the bottleneck, and the run is invalid (see below).
 
 A run that cannot connect any phone stops with an error instead of reporting a clean run.
@@ -17,7 +18,7 @@ A run that cannot connect any phone stops with an error instead of reporting a c
 After the figures, a run checks each threshold in [`src/thresholds.ts`](src/thresholds.ts) and prints one line per check, with the measured value, the limit and whether it passed. A value equal to its limit passes. Then it prints the outcome: PASS, FAIL or INVALID.
 
 - **Arrival before sound p1:** the 1st percentile of how long before its sound each chunk arrived. When it is at least the limit, 99% of chunks arrived at least that long before they had to sound. Chunks that reached a phone before it had a clock are not in this figure; they are printed as a count and have no threshold.
-- **Missing chunks** and **drops:** every phone receives every chunk, and no phone loses its connection while the track plays.
+- **Missing chunks** and **drops during the track:** every phone receives every chunk, and no phone loses its connection while the track plays. Drops before the track are printed as a count and have no threshold.
 - **Clock offset off the median p99:** 99% of the sampled offsets are that close to the median of all phones.
 - **Generator event loop p99:** the load generator kept up. When its own event loop fell behind by more than the limit, the generator could not have read or answered the server on time, so a late chunk or a slow clock answer might be its own fault. The run is then INVALID, whatever the other checks say, and should be repeated with a faster laptop or fewer phones. The checks are still printed.
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { RunResult } from '../src/results'
 import { summarize } from '../src/stats'
-import { THRESHOLDS } from '../src/thresholds'
-import { judge, Threshold } from '../src/verdict'
+import { Threshold, THRESHOLDS } from '../src/thresholds'
+import { judge } from '../src/verdict'
 
 const empty = summarize([])
 
@@ -16,18 +16,19 @@ const healthy = (): RunResult => ({
   missingChunks: 0,
   connects: 10,
   drops: 0,
+  dropsBeforeTrack: 0,
   roundTripMs: { count: 200, min: 1, median: 2, p1: 1, p95: 3, p99: 4, max: 5 },
   roundTripsAtStart: { count: 10, min: 20, median: 20, p1: 20, p95: 20, p99: 20, max: 20 },
   offsetFromMedianMs: { count: 300, min: 0, median: 0.5, p1: 0, p95: 1, p99: 2, max: 3 },
   generatorDelayMs: { p99: 1.5, max: 4 }
 })
 
-/** One result per threshold, just across its limit. */
-const outside: [string, (result: RunResult) => void][] = [
-  ['arrival lead p1', (result) => (result.arrivalLeadMs.p1 = 499)],
-  ['missing chunks', (result) => (result.missingChunks = 1)],
-  ['drops', (result) => (result.drops = 1)],
-  ['offset from the median p99', (result) => (result.offsetFromMedianMs.p99 = 10.5)]
+/** One result per threshold, just across its limit, with the figure the failing check must name. */
+const outside: [string, keyof RunResult, (result: RunResult) => void][] = [
+  ['arrival lead p1', 'arrivalLeadMs', (result) => (result.arrivalLeadMs.p1 = 499)],
+  ['missing chunks', 'missingChunks', (result) => (result.missingChunks = 1)],
+  ['drops', 'drops', (result) => (result.drops = 1)],
+  ['offset from the median p99', 'offsetFromMedianMs', (result) => (result.offsetFromMedianMs.p99 = 10.5)]
 ]
 
 const failed = (verdict: ReturnType<typeof judge>) => verdict.checks.filter((check) => !check.passed)
@@ -40,13 +41,14 @@ describe('the verdict on a run', () => {
     expect(failed(verdict)).toEqual([])
   })
 
-  it.each(outside)('fails a run outside the %s threshold and names it with its value and limit', (_, spoil) => {
+  it.each(outside)('fails a run outside the %s threshold and names it with its value and limit', (_, figure, spoil) => {
     const result = healthy()
     spoil(result)
     const verdict = judge(result)
     expect(verdict.outcome).toBe('fail')
     const [check, ...others] = failed(verdict)
     expect(others).toEqual([])
+    expect(check?.threshold.figure).toBe(figure)
     expect(check?.threshold.consequence).toBe('fail')
     expect(check?.value).not.toBeNull()
     expect(check?.value).not.toBe(check?.threshold.limit)

@@ -1,35 +1,5 @@
 import { RunResult } from './results'
-import { THRESHOLDS } from './thresholds'
-
-/** The fields of an object that hold a number, or a number the run may not have measured. */
-type NumberFields<T> = { [K in keyof T]-?: T[K] extends number | null ? K : never }[keyof T]
-
-/** A value a threshold can read from a figure that holds several, such as `p1` for the 1st percentile or `median`. */
-export type Statistic = {
-  [F in keyof RunResult]: RunResult[F] extends number ? never : NumberFields<RunResult[F]>
-}[keyof RunResult]
-
-/**
- * Which value of a run a threshold reads: a figure that is a plain number, or
- * one statistic of a figure that holds several.
- */
-type Reading = {
-  [F in keyof RunResult]: RunResult[F] extends number
-    ? { figure: F; statistic?: undefined }
-    : { figure: F; statistic: NumberFields<RunResult[F]> }
-}[keyof RunResult]
-
-/**
- * One rule a run is judged by. A run whose value is on the wrong side of the
- * limit fails the check; its consequence says whether that makes the run fail
- * or makes it invalid, which means the load generator, not the server, fell
- * behind and the run says nothing about the server.
- */
-export type Threshold = Reading & {
-  bound: 'atLeast' | 'atMost'
-  limit: number
-  consequence: 'fail' | 'invalid'
-}
+import { Threshold, THRESHOLDS } from './thresholds'
 
 export interface Verdict {
   outcome: 'pass' | 'fail' | 'invalid'

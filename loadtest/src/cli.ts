@@ -2,7 +2,8 @@ import { parseOptions } from './options'
 import { RunResult } from './results'
 import { runFixed } from './run'
 import { Summary } from './stats'
-import { judge, Threshold, Verdict } from './verdict'
+import { Threshold } from './thresholds'
+import { judge, Verdict } from './verdict'
 
 const email = process.env.SADISS_ADMIN_EMAIL
 const password = process.env.SADISS_ADMIN_PASSWORD
@@ -34,7 +35,8 @@ const FIGURES: Record<keyof RunResult, { label: string; unit: (value: number | n
   missingChunks: { label: 'Missing chunks', unit: count },
   arrivalsWithoutClock: { label: 'Chunks before a clock', unit: count },
   connects: { label: 'Connects', unit: count },
-  drops: { label: 'Drops', unit: count },
+  drops: { label: 'Drops during the track', unit: count },
+  dropsBeforeTrack: { label: 'Drops before the track', unit: count },
   generatorDelayMs: { label: 'Generator event loop', unit: ms }
 }
 
@@ -82,6 +84,7 @@ console.log(
     countLine('arrivalsWithoutClock', result.arrivalsWithoutClock),
     countLine('connects', result.connects),
     countLine('drops', result.drops),
+    countLine('dropsBeforeTrack', result.dropsBeforeTrack),
     `${FIGURES.generatorDelayMs.label.padEnd(LABEL_WIDTH)} p99 ${ms(result.generatorDelayMs.p99)}, max ${ms(result.generatorDelayMs.max)}`,
     '',
     ...verdict.checks.map(checkLine),
