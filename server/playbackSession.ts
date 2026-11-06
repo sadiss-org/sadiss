@@ -4,8 +4,9 @@ import { logger } from './tools'
 import { Recipient } from './lib/audience'
 import { PartialMap } from './partialDistribution'
 import { payloadsForChunk } from './chunkPayloads'
+import { CHUNK_SECONDS } from './types/ChunkEnvelope'
 
-const CHUNK_INTERVAL_MS = 1000
+const CHUNK_INTERVAL_MS = CHUNK_SECONDS * 1000
 
 /**
  * How far ahead of its own position a chunk is dated, giving it time to reach a

@@ -1,4 +1,5 @@
-import { Frame, PartialChunk, TrackSettings } from './types'
+import { Frame, TrackSettings } from './types'
+import { Chunk, ChunkEnvelope } from './types/ChunkEnvelope'
 import { Recipient } from './lib/audience'
 import { distributePartials, PartialMap } from './partialDistribution'
 
@@ -13,11 +14,6 @@ const MAX_PARTIALS_PER_CLIENT = 16
  * emit deliberately different shapes and both are pinned by tests.
  */
 
-/** The audio and speech a device is given for one chunk. */
-interface Chunk {
-  partials?: PartialChunk[]
-  ttsInstructions?: { time: number; phrase: string }
-}
 
 /** One device's message for one chunk, already serialised. */
 export interface DeviceMessage {
@@ -32,13 +28,10 @@ export interface ChunkPayloads {
   nextMap: PartialMap
 }
 
-const envelope = (chunk: Chunk, playAt: number, settings: TrackSettings) =>
-  JSON.stringify({
-    startTime: playAt,
-    waveform: settings.waveform,
-    ttsRate: settings.ttsRate,
-    chunk
-  })
+const envelope = (chunk: Chunk, playAt: number, settings: TrackSettings) => {
+  const message: ChunkEnvelope = { startTime: playAt, waveform: settings.waveform, ttsRate: settings.ttsRate, chunk }
+  return JSON.stringify(message)
+}
 
 /**
  * Choir mode: a device plays the partial whose index is its choir id, and hears
