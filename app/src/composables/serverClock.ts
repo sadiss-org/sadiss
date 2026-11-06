@@ -31,7 +31,8 @@ export const roundTripOffset = (r: RoundTrip): number => (r.serverRecv - r.t0 + 
 const median = (xs: number[]): number => {
   const s = [...xs].sort((a, b) => a - b)
   const mid = Math.floor(s.length / 2)
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
+  const upper = s[mid] ?? Number.NaN
+  return s.length % 2 ? upper : ((s[mid - 1] ?? upper) + upper) / 2
 }
 
 export class ServerClock {

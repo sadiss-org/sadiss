@@ -1,0 +1,17 @@
+{
+  "name": "sadiss-loadtest",
+  "private": true,
+  "type": "module",
+  "description": "Virtual phones that run the app's own clock code against a SADISS server, to find how many phones it carries.",
+  "scripts": {
+    "loadtest": "tsx src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4"
+  }
+}
