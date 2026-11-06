@@ -1,6 +1,7 @@
 import { reactive, ref } from 'vue'
 import { TextToSpeech } from '@capacitor-community/text-to-speech'
 import { PartialChunk, OscillatorObject, Breakpoint } from '../types/types'
+import { useMainStore } from '@/stores/MainStore'
 
 const BREAKPOINT_LENGTH = 0.01 // in seconds
 const AMP_MIN_VALUE = 0.000001
@@ -10,10 +11,36 @@ let ctx: AudioContext
 let offset: number
 let motion: { pos: number } = reactive({ pos: -1 })
 let outputLatencyOffset = 0
-let ttsLanguage: string
 let waveform: OscillatorType
 let ttsRate = 1
 let keepAlive: HTMLAudioElement | undefined
+
+/**
+ * Languages the phone was found to have a voice for. Only a yes is kept: on
+ * Android the check also answers no while the speech engine is still starting.
+ */
+const languagesWithVoice = new Set<string>()
+
+/**
+ * The language to speak a phrase in: the one the QR code offered, or undefined
+ * for the plugin's own default voice (en-US). A phone without a voice for the
+ * offered language gets the default voice too, because a phrase read with the
+ * wrong accent is better than one that is not heard at all. If the check itself
+ * fails, the offered language is used, as it would be without the check.
+ */
+const voiceLanguage = async (): Promise<string | undefined> => {
+  const iso = useMainStore().selectedLanguage.iso
+  if (!iso) return undefined
+  if (languagesWithVoice.has(iso)) return iso
+
+  const supported = await TextToSpeech.isLanguageSupported({ lang: iso }).then(
+    (result) => result.supported,
+    () => true
+  )
+  if (!supported) return undefined
+  languagesWithVoice.add(iso)
+  return iso
+}
 
 /**
  * One second of 8 kHz mono 16-bit silence as a WAV blob URL.
@@ -230,16 +257,12 @@ export function usePlayer() {
   const speak = async (text: string) => {
     await TextToSpeech.speak({
       text: text,
-      lang: ttsLanguage,
+      lang: await voiceLanguage(),
       rate: ttsRate,
       pitch: 1.0,
       volume: 1.0,
       category: 'playback'
     })
-  }
-
-  const setTtsLanguage = (lang: string) => {
-    ttsLanguage = lang
   }
 
   const setMotionRef = (motionRef: { pos: number }) => (motion = motionRef)
@@ -257,7 +280,6 @@ export function usePlayer() {
     handleChunkData,
     preparePlaybackAndTts,
     setStartTime,
-    setTtsLanguage,
     setMotionRef,
     setTrackSettings,
     stopPlayback,
