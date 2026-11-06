@@ -31,6 +31,9 @@ export const summarize = (values: number[]): Summary => {
   }
 }
 
+/** The fewest phones with a clock offset that have a median to be measured against. */
+export const MIN_PHONES = 2
+
 /**
  * How far each phone's clock offset is from the median offset of all phones at
  * one moment, in ms. All virtual phones of a run share one physical clock, so a
@@ -41,7 +44,7 @@ export const summarize = (values: number[]): Summary => {
  */
 export const distancesFromMedian = (offsets: (number | null)[]) => {
   const known = offsets.filter((offset): offset is number => offset !== null)
-  if (known.length < 2) return []
+  if (known.length < MIN_PHONES) return []
   const median = summarize(known).median ?? 0
   return known.map((offset) => Math.abs(offset - median))
 }

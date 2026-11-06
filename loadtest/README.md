@@ -28,7 +28,7 @@ The exit code follows the outcome:
 | Exit code | Meaning |
 | --- | --- |
 | 0 | PASS: every threshold was met. |
-| 1 | The load test itself crashed, such as when no phone could connect or the server stopped answering the admin API. |
+| 1 | The load test itself crashed, such as when no phone could connect or the server stopped answering the admin API before the track ended. A server that stops answering during the track fails the run instead: stopping the track at the end only prints a warning when it fails. |
 | 2 | Usage error: missing credentials or an option that is refused. |
 | 3 | FAIL: the server missed at least one threshold. |
 | 4 | INVALID: the load generator fell behind. |
@@ -54,7 +54,7 @@ npm install
 SADISS_ADMIN_EMAIL=loadtest@example.invalid SADISS_ADMIN_PASSWORD=<the same> npm run loadtest -- --phones 10 --seconds 30
 ```
 
-Options, with their defaults: `--api http://127.0.0.1:3000`, `--ws ws://127.0.0.1:8080`, `--phones 10`, `--seconds 30` (track length), `--partials 16` (partials per frame; in nonChoir mode the server shares them out over the phones, at most 16 each), `--join-over 5` (seconds over which the phones join) and `--settle 60` (seconds the phones measure their clocks before the track starts). A value that is not a number is refused, and so is `--phones` below 2, since the offset from the median needs at least two phones.
+Options, with their defaults: `--api http://127.0.0.1:3000`, `--ws ws://127.0.0.1:8080`, `--phones 10`, `--seconds 30` (track length), `--partials 16` (partials per frame; in nonChoir mode the server shares them out over the phones, at most 16 each), `--join-over 5` (seconds over which the phones join) and `--settle 60` (seconds the phones measure their clocks before the track starts). A value that is not a number is refused, and so is `--phones` below 2, since the offset from the median needs at least two phones (`MIN_PHONES` in [`src/stats.ts`](src/stats.ts)).
 
 Each run uploads its own track into a new performance, named `loadtest` with the time of the run.
 
