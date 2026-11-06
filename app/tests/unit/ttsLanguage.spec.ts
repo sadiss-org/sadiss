@@ -91,4 +91,15 @@ describe('the language a TTS phrase is spoken in', () => {
     expect(phraseLanguages()).toEqual(['de-DE', 'de-DE', 'de-DE'])
     expect(isLanguageSupported).toHaveBeenCalledTimes(1)
   })
+
+  it('is asked for again after a no, so an engine that was still starting does not keep the default voice', async () => {
+    isLanguageSupported.mockResolvedValueOnce({ supported: false }).mockResolvedValue({ supported: true })
+    await scanAndSpeak([{ iso: 'de-DE', lang: 'Deutsch' }], undefined, 2)
+    expect(phraseLanguages()).toEqual([undefined, 'de-DE'])
+  })
+
+  it('is not checked for a voice when the QR code offers no language', async () => {
+    await scanAndSpeak(undefined)
+    expect(isLanguageSupported).not.toHaveBeenCalled()
+  })
 })

@@ -15,30 +15,31 @@ let waveform: OscillatorType
 let ttsRate = 1
 let keepAlive: HTMLAudioElement | undefined
 
-/** Whether the phone has a voice for a language, asked once per language. */
-const voiceAvailable = new Map<string, Promise<boolean>>()
+/**
+ * Languages the phone was found to have a voice for. Only a yes is kept: on
+ * Android the check also answers no while the speech engine is still starting.
+ */
+const languagesWithVoice = new Set<string>()
 
 /**
  * The language to speak a phrase in: the one the QR code offered, or undefined
- * for the plugin's own default voice. A phone without a voice for the offered
- * language gets the default voice too, because a phrase read with the wrong
- * accent is better than one that is not heard at all. If the check itself
+ * for the plugin's own default voice (en-US). A phone without a voice for the
+ * offered language gets the default voice too, because a phrase read with the
+ * wrong accent is better than one that is not heard at all. If the check itself
  * fails, the offered language is used, as it would be without the check.
  */
 const voiceLanguage = async (): Promise<string | undefined> => {
   const iso = useMainStore().selectedLanguage.iso
   if (!iso) return undefined
+  if (languagesWithVoice.has(iso)) return iso
 
-  if (!voiceAvailable.has(iso)) {
-    voiceAvailable.set(
-      iso,
-      TextToSpeech.isLanguageSupported({ lang: iso }).then(
-        ({ supported }) => supported,
-        () => true
-      )
-    )
-  }
-  return (await voiceAvailable.get(iso)) ? iso : undefined
+  const supported = await TextToSpeech.isLanguageSupported({ lang: iso }).then(
+    (result) => result.supported,
+    () => true
+  )
+  if (!supported) return undefined
+  languagesWithVoice.add(iso)
+  return iso
 }
 
 /**
