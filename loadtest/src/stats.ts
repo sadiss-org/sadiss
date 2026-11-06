@@ -2,6 +2,7 @@ export interface Summary {
   count: number
   min: number | null
   median: number | null
+  p1: number | null
   p95: number | null
   p99: number | null
   max: number | null
@@ -17,17 +18,21 @@ const percentile = (sorted: number[], p: number) => {
 }
 
 export const summarize = (values: number[]): Summary => {
-  if (!values.length) return { count: 0, min: null, median: null, p95: null, p99: null, max: null }
+  if (!values.length) return { count: 0, min: null, median: null, p1: null, p95: null, p99: null, max: null }
   const sorted = [...values].sort((a, b) => a - b)
   return {
     count: sorted.length,
     min: sorted[0] ?? null,
     median: percentile(sorted, 0.5),
+    p1: percentile(sorted, 0.01),
     p95: percentile(sorted, 0.95),
     p99: percentile(sorted, 0.99),
     max: sorted[sorted.length - 1] ?? null
   }
 }
+
+/** The fewest phones with a clock offset that have a median to be measured against. */
+export const MIN_PHONES = 2
 
 /**
  * How far each phone's clock offset is from the median offset of all phones at
@@ -39,7 +44,7 @@ export const summarize = (values: number[]): Summary => {
  */
 export const distancesFromMedian = (offsets: (number | null)[]) => {
   const known = offsets.filter((offset): offset is number => offset !== null)
-  if (known.length < 2) return []
+  if (known.length < MIN_PHONES) return []
   const median = summarize(known).median ?? 0
   return known.map((offset) => Math.abs(offset - median))
 }
