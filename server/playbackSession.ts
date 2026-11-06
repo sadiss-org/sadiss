@@ -132,17 +132,17 @@ export class PlaybackSession {
         return
       }
 
+      const behindMs = Date.now() - expected
+      if (behindMs > CHUNK_INTERVAL_MS) {
+        const skipped = skipChunksAlreadyOver()
+        expected += skipped * CHUNK_INTERVAL_MS
+        logger.warn(`Sending fell ${behindMs} ms behind; skipped ${skipped} chunks that were already over.`)
+      }
+
       const shouldContinue = handleTrackEnd()
       if (!shouldContinue) return
 
       const dt = Date.now() - expected
-      if (dt > CHUNK_INTERVAL_MS) {
-        logger.warn('Sending interval somehow broke. Stopping.')
-        this.running = false
-        reset()
-        return
-      }
-
       const devices = audienceNow()
 
       if (devices.length) {
@@ -156,6 +156,22 @@ export class PlaybackSession {
 
       expected += CHUNK_INTERVAL_MS
       setTimeout(step, Math.max(0, CHUNK_INTERVAL_MS - dt))
+    }
+
+    /**
+     * Moves past every chunk whose second has already finished sounding, and
+     * returns how many that was. A chunk that is late but still has sound ahead
+     * of it is kept: devices schedule it by its date, not by when it arrives,
+     * so they play what is left of it at the right moment.
+     */
+    const skipChunksAlreadyOver = () => {
+      const chunkOverAtMs = (index: number) => (actualStartTime + LEAD_SECONDS + index + 1) * 1000
+      let skipped = 0
+      while (chunkOverAtMs(chunkIndex) <= Date.now()) {
+        chunkIndex++
+        skipped++
+      }
+      return skipped
     }
 
     // Start
@@ -173,8 +189,10 @@ export class PlaybackSession {
       if (chunkIndex >= this.frames.length) {
         if (this.loop) {
           logger.info('No more chunks. Looping.')
+          // Subtracting rather than resetting to 0 keeps the place a stall
+          // skipped to, so the next round goes on at the chunk now due.
           actualStartTime += this.frames.length
-          chunkIndex = 0
+          chunkIndex -= this.frames.length
           return true
         } else {
           logger.info('No more chunks. Stopping.')
