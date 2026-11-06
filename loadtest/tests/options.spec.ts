@@ -21,6 +21,7 @@ describe('the command line', () => {
   it.each([
     ['--phones', 'abc'],
     ['--phones', '0'],
+    ['--phones', '1'],
     ['--phones', '2.5'],
     ['--seconds', 'abc'],
     ['--seconds', '0'],

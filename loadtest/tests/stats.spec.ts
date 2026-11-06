@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { distancesFromMedian, summarize } from '../src/stats'
 
 describe('a summary of measured values', () => {
-  it('gives the median, the 95th and 99th percentile and the extremes', () => {
+  it('gives the median, the 1st, 95th and 99th percentile and the extremes', () => {
     const values = Array.from({ length: 100 }, (_, i) => i + 1)
-    expect(summarize(values)).toEqual({ count: 100, min: 1, median: 50.5, p95: 95.05, p99: 99.01, max: 100 })
+    expect(summarize(values)).toEqual({ count: 100, min: 1, median: 50.5, p1: 1.99, p95: 95.05, p99: 99.01, max: 100 })
   })
 
   it('is empty for no values', () => {
-    expect(summarize([])).toEqual({ count: 0, min: null, median: null, p95: null, p99: null, max: null })
+    expect(summarize([])).toEqual({ count: 0, min: null, median: null, p1: null, p95: null, p99: null, max: null })
   })
 })
 
