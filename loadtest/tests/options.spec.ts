@@ -11,8 +11,14 @@ describe('the command line', () => {
       track: { seconds: 30, partialsPerFrame: 16, choir: false, tts: null },
       joinOverMs: 5000,
       lateShare: 0.1,
-      settleMs: 60000
+      settleMs: 60000,
+      serverCommit: undefined,
+      note: null
     })
+  })
+
+  it('keeps a note and a server commit given on the command line', () => {
+    expect(parseOptions(['--note', 'live instance idle', '--server-commit', 'f00d'])).toMatchObject({ note: 'live instance idle', serverCommit: 'f00d' })
   })
 
   it('makes a choir track with one partial per voice', () => {

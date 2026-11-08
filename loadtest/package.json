@@ -5,6 +5,7 @@
   "description": "Virtual phones that run the app's own clock code against a SADISS server, to find how many phones it carries.",
   "scripts": {
     "loadtest": "tsx src/cli.ts",
+    "compare": "tsx src/compareCli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

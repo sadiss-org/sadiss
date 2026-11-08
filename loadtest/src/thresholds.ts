@@ -8,7 +8,7 @@ type NumberFields<T> = { [K in keyof T]-?: T[K] extends number | null ? K : neve
  * Which value of a run a threshold reads: a figure that is a plain number, or
  * one statistic of a figure that holds several.
  */
-type Reading = {
+export type Reading = {
   [F in keyof RunResult]: RunResult[F] extends number
     ? { figure: F; statistic?: undefined }
     : { figure: F; statistic: NumberFields<RunResult[F]> }

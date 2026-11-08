@@ -1,5 +1,5 @@
 import { RunResult } from './results'
-import { Threshold, thresholdsFor } from './thresholds'
+import { Reading, Threshold, thresholdsFor } from './thresholds'
 
 export interface Verdict {
   outcome: 'pass' | 'fail' | 'invalid'
@@ -15,11 +15,12 @@ const MEETS: Record<Threshold['bound'], (value: number, limit: number) => boolea
   atMost: (value, limit) => value <= limit
 }
 
-const read = (result: RunResult, threshold: Threshold): number | null => {
-  const figure: unknown = result[threshold.figure]
-  if (threshold.statistic === undefined) return typeof figure === 'number' ? figure : null
+/** The value of a run that a reading names, or null when the run did not measure it. */
+export const read = (result: RunResult, reading: Reading): number | null => {
+  const figure: unknown = result[reading.figure]
+  if (reading.statistic === undefined) return typeof figure === 'number' ? figure : null
   if (typeof figure !== 'object' || figure === null) return null
-  const value: unknown = Reflect.get(figure, threshold.statistic)
+  const value: unknown = Reflect.get(figure, reading.statistic)
   return typeof value === 'number' ? value : null
 }
 

@@ -13,6 +13,10 @@ export interface Options {
   lateShare: number
   /** How long the phones measure their clocks after the last one joined, before the track starts, in ms. */
   settleMs: number
+  /** The commit the server under test runs, when given instead of found (see `findServerCommit`). */
+  serverCommit: string | undefined
+  /** Kept in the results file with the run. */
+  note: string | null
 }
 
 const number = (option: string, value: string, { atLeast, whole }: { atLeast: number; whole: boolean }) => {
@@ -53,7 +57,9 @@ export const parseOptions = (args: string[]): Options => {
       'late-share': { type: 'string', default: '0.1' },
       // The app's clock keeps its last 20 round trips, one every 3 s, so its
       // estimate is settled about a minute after a phone joins.
-      settle: { type: 'string', default: '60' }
+      settle: { type: 'string', default: '60' },
+      'server-commit': { type: 'string' },
+      note: { type: 'string' }
     }
   })
 
@@ -85,6 +91,8 @@ export const parseOptions = (args: string[]): Options => {
     },
     joinOverMs: number('join-over', values['join-over'], { atLeast: 0, whole: false }) * 1000,
     lateShare,
-    settleMs: number('settle', values.settle, { atLeast: 0, whole: false }) * 1000
+    settleMs: number('settle', values.settle, { atLeast: 0, whole: false }) * 1000,
+    serverCommit: values['server-commit'],
+    note: values.note ?? null
   }
 }
