@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseOptions } from '../src/options'
+import { MIN_PHONES } from '../src/stats'
 
 describe('the command line', () => {
   it('has defaults for everything', () => {
@@ -18,9 +19,15 @@ describe('the command line', () => {
     expect(options).toMatchObject({ phones: 100, track: { seconds: 45, partialsPerFrame: 4 }, joinOverMs: 20000, settleMs: 0 })
   })
 
+  it('accepts as few phones as the offset from the median needs, and refuses one fewer', () => {
+    expect(parseOptions(['--phones', String(MIN_PHONES)]).phones).toBe(MIN_PHONES)
+    expect(() => parseOptions(['--phones', String(MIN_PHONES - 1)])).toThrow(`at least ${MIN_PHONES}`)
+  })
+
   it.each([
     ['--phones', 'abc'],
     ['--phones', '0'],
+    ['--phones', '1'],
     ['--phones', '2.5'],
     ['--seconds', 'abc'],
     ['--seconds', '0'],

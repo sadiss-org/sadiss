@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util'
+import { MIN_PHONES } from './stats'
 import { TrackShape } from './track'
 
 export interface Options {
@@ -43,7 +44,7 @@ export const parseOptions = (args: string[]): Options => {
   return {
     apiUrl: values.api,
     wsUrl: values.ws,
-    phones: number('phones', values.phones, { atLeast: 1, whole: true }),
+    phones: number('phones', values.phones, { atLeast: MIN_PHONES, whole: true }),
     track: {
       seconds: number('seconds', values.seconds, { atLeast: 1, whole: true }),
       partialsPerFrame: number('partials', values.partials, { atLeast: 1, whole: true })

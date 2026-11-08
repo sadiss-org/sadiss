@@ -1,6 +1,9 @@
 import { parseOptions } from './options'
+import { RunResult } from './results'
 import { runFixed } from './run'
 import { Summary } from './stats'
+import { Threshold } from './thresholds'
+import { judge, Verdict } from './verdict'
 
 const email = process.env.SADISS_ADMIN_EMAIL
 const password = process.env.SADISS_ADMIN_PASSWORD
@@ -17,29 +20,76 @@ try {
   process.exit(2)
 }
 
-const ms = (value: number | null) => (value === null ? '-' : `${Math.round(value)} ms`)
-const line = (label: string, summary: Summary, unit = ms) =>
-  `${label.padEnd(28)} median ${unit(summary.median)}, p95 ${unit(summary.p95)}, p99 ${unit(summary.p99)}, min ${unit(summary.min)}, max ${unit(summary.max)} (${summary.count} values)`
+const ms = (value: number | null) => (value === null ? '-' : `${Number(value.toFixed(2))} ms`)
 const count = (value: number | null) => (value === null ? '-' : String(Math.round(value)))
+
+/** How each figure of a run is named and shown, in the figure lines and in the check lines alike. */
+const FIGURES: Record<keyof RunResult, { label: string; unit: (value: number | null) => string }> = {
+  phones: { label: 'Phones', unit: count },
+  track: { label: 'Track', unit: count },
+  chunkCount: { label: 'Chunks in the track', unit: count },
+  arrivalLeadMs: { label: 'Arrival before sound', unit: ms },
+  offsetFromMedianMs: { label: 'Clock offset off the median', unit: ms },
+  roundTripMs: { label: 'Measurement round trip', unit: ms },
+  roundTripsAtStart: { label: 'Round trips at track start', unit: count },
+  missingChunks: { label: 'Missing chunks', unit: count },
+  arrivalsWithoutClock: { label: 'Chunks before a clock', unit: count },
+  connects: { label: 'Connects', unit: count },
+  dropsDuringTrack: { label: 'Drops during the track', unit: count },
+  dropsBeforeTrack: { label: 'Drops before the track', unit: count },
+  generatorDelayMs: { label: 'Generator event loop', unit: ms }
+}
+
+const LABEL_WIDTH = 32
+
+const summaryLine = (figure: keyof RunResult, summary: Summary) => {
+  const { label, unit } = FIGURES[figure]
+  return `${label.padEnd(LABEL_WIDTH)} median ${unit(summary.median)}, p1 ${unit(summary.p1)}, p95 ${unit(summary.p95)}, p99 ${unit(summary.p99)}, min ${unit(summary.min)}, max ${unit(summary.max)} (${summary.count} values)`
+}
+const countLine = (figure: keyof RunResult, value: number) => `${FIGURES[figure].label.padEnd(LABEL_WIDTH)} ${FIGURES[figure].unit(value)}`
+
+const BOUNDS: Record<Threshold['bound'], string> = { atLeast: 'at least', atMost: 'at most' }
+const checkLine = ({ threshold, value, passed }: Verdict['checks'][number]) => {
+  const { label, unit } = FIGURES[threshold.figure]
+  const name = threshold.statistic === undefined ? label : `${label} ${threshold.statistic}`
+  const measured = `${unit(value)}, ${BOUNDS[threshold.bound]} ${unit(threshold.limit)}`
+  return `${name.padEnd(LABEL_WIDTH)} ${measured.padEnd(28)} ${passed ? 'pass' : 'fail'}`
+}
+
+/** 1 is left to a crash, which is what Node exits with on an uncaught error, and 2 to a usage error. */
+const EXIT_CODES: Record<Verdict['outcome'], number> = { pass: 0, fail: 3, invalid: 4 }
+const OUTCOMES: Record<Verdict['outcome'], (verdict: Verdict) => string> = {
+  pass: () => 'PASS',
+  fail: () => 'FAIL: the server missed a threshold.',
+  invalid: (verdict) => `INVALID: ${verdict.invalidBecause.join(' ')}`
+}
 
 let result
 try {
-  result = await runFixed(options, { email, password })
+  result = await runFixed(options, { email, password }, (message) => console.warn(message))
 } catch (error) {
   console.error(error instanceof Error ? error.message : error)
   process.exit(1)
 }
 
+const verdict = judge(result)
 console.log(
   [
     `${result.phones} phones, track of ${result.chunkCount} chunks with ${result.track.partialsPerFrame} partials per frame`,
-    line('Arrival before sound', result.arrivalLeadMs),
-    line('Clock offset off the median', result.offsetFromMedianMs),
-    line('Measurement round trip', result.roundTripMs),
-    line('Round trips at track start', result.roundTripsAtStart, count),
-    `${'Missing chunks'.padEnd(28)} ${result.missingChunks}`,
-    `${'Chunks before a clock'.padEnd(28)} ${result.arrivalsWithoutClock}`,
-    `${'Connects / drops'.padEnd(28)} ${result.connects} / ${result.drops}`,
-    `${'Generator event loop'.padEnd(28)} p99 ${result.generatorDelayMs.p99} ms, max ${result.generatorDelayMs.max} ms`
+    summaryLine('arrivalLeadMs', result.arrivalLeadMs),
+    summaryLine('offsetFromMedianMs', result.offsetFromMedianMs),
+    summaryLine('roundTripMs', result.roundTripMs),
+    summaryLine('roundTripsAtStart', result.roundTripsAtStart),
+    countLine('missingChunks', result.missingChunks),
+    countLine('arrivalsWithoutClock', result.arrivalsWithoutClock),
+    countLine('connects', result.connects),
+    countLine('dropsDuringTrack', result.dropsDuringTrack),
+    countLine('dropsBeforeTrack', result.dropsBeforeTrack),
+    `${FIGURES.generatorDelayMs.label.padEnd(LABEL_WIDTH)} p99 ${ms(result.generatorDelayMs.p99)}, max ${ms(result.generatorDelayMs.max)}`,
+    '',
+    ...verdict.checks.map(checkLine),
+    '',
+    OUTCOMES[verdict.outcome](verdict)
   ].join('\n')
 )
+process.exitCode = EXIT_CODES[verdict.outcome]
