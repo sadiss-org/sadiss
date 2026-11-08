@@ -16,6 +16,8 @@ interface Margin {
 
 /** A time may get 10% or 5 ms worse, whichever is more. */
 const TIME: Margin = { relative: 0.1, absolute: 5 }
+/** A share of CPU may grow by 10% or 5 points, and memory by 10% or 5 MB, whichever is more. */
+const LOAD: Margin = { relative: 0.1, absolute: 5 }
 /** A count may not grow at all. */
 const COUNT: Margin = { relative: 0, absolute: 0 }
 
@@ -37,7 +39,12 @@ const COMPARED: readonly Compared[] = [
   { figure: 'connects', better: 'lower', margin: COUNT },
   { figure: 'dropsDuringTrack', better: 'lower', margin: COUNT },
   { figure: 'dropsBeforeTrack', better: 'lower', margin: COUNT },
-  { figure: 'generatorDelayMs', statistic: 'p99', better: 'lower', margin: TIME }
+  { figure: 'generatorDelayMs', statistic: 'p99', better: 'lower', margin: TIME },
+  { figure: 'serverCpuPct', statistic: 'p95', better: 'lower', margin: LOAD },
+  { figure: 'serverCpuPct', statistic: 'max', better: 'lower', margin: LOAD },
+  { figure: 'serverRssMb', statistic: 'max', better: 'lower', margin: LOAD },
+  { figure: 'serverRestarts', better: 'lower', margin: COUNT },
+  { figure: 'boxAvailableMb', statistic: 'min', better: 'higher', margin: LOAD }
 ]
 
 /** How far a value moved the wrong way from the baseline, per direction. */

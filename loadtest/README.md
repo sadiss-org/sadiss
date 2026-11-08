@@ -17,6 +17,7 @@ With `--voices`, the track is in choir mode: each partial is one voice, and a ph
 - **Round trips at track start:** how many clock measurements each phone that joined before the track had completed when the track started. The app's clock estimate uses the last 20, one every 3 s, so it is settled about a minute after a phone joins.
 - **Measurement round trip** (every clock measurement from joining to the end of the track), **missing chunks** (counted per phone), **chunks before a clock** (received before the phone had any clock estimate), and **connects** (every connection the phones opened, from joining to the end of the track).
 - **Drops during the track** and **drops before the track:** how often a phone lost a live connection from the start of the track until it was stopped (including the few seconds after the last chunk in which late chunks may still arrive), and before it started, while the phones joined and settled.
+- **Server CPU of one core, server memory, server open sockets, server restarts, box load and box memory available:** the server under test and its box, sampled every 5 s from the first phone joining until the track is stopped (see "Server samples" below). CPU is the share of one core the server's process used between two samples, so about 100% means its main thread was always busy, whatever the box's other cores did. A restart is a change of the process listening on the server's port, such as after a crash.
 - **Generator event loop:** how far the load generator's own event loop fell behind while the track played. When this is high, the generator, not the server, was the bottleneck, and the run is invalid (see below).
 
 A run that cannot connect any phone stops with an error instead of reporting a clean run.
@@ -74,9 +75,17 @@ npm run loadtest -- --phones 20 --voices 4 --langs en-US,de-DE --phrase-every 3 
 
 Each run uploads its own track into a new performance, named `loadtest` with the time of the run.
 
+## Server samples
+
+[`src/sampleServer.sh`](src/sampleServer.sh) runs next to the server for the length of a run and prints one line every 5 s: the CPU time, resident memory and open sockets of the process listening on the server's HTTP port, and the box's load and available memory. It reads them from `/proc` and `ss`, and changes nothing. For the capacity instance it runs on the box over one ssh connection, finding the process by the HTTP port in `capacity/config.sh`; for a server on this machine it runs here, by the port of `--api`. Any other server is not sampled.
+
+When the script cannot run, such as without ssh access to the box, the run still completes, prints why the server was not sampled where the server's figures would be, and keeps that reason in its results file. The samples themselves are kept in the results file too, so a later look can tell what the server did at any moment of the run.
+
+The server's event-loop delay is not sampled: the server does not measure it yet.
+
 ## Results files and comparing runs
 
-Every run that reaches a verdict keeps a results file in [`results/`](results/), named by when it started (UTC), the target and the number of phones, such as `2026-11-08T1930Z-sadiss.net-capacity-server-100p.json`. It holds the commit of the server under test, the commit of the load test, the target, the time, the machine the generator ran on, the note, every figure and the verdict, with the figures named as the summary names them ([`src/figures.ts`](src/figures.ts)). Commit the files of runs worth keeping.
+Every run that reaches a verdict keeps a results file in [`results/`](results/), named by when it started (UTC), the target and the number of phones, such as `2026-11-08T1930Z-sadiss.net-capacity-server-100p.json`. It holds the commit of the server under test, the commit of the load test, the target, the time, the machine the generator ran on, the note, every figure, the verdict and the server samples, with the figures named as the summary names them ([`src/figures.ts`](src/figures.ts)). Commit the files of runs worth keeping.
 
 The server does not report its commit, so the run finds it: for the capacity instance, the first line of its `DEPLOYED.txt` over ssh, with a warning when that deploy did not finish; for a server on this machine, this checkout's commit, with `-dirty` when `server/` has uncommitted changes. For any other server, or when that fails, the run warns and keeps the commit as unknown unless `--server-commit` gives it.
 
@@ -86,7 +95,7 @@ To put runs side by side, the first as the baseline:
 npm run compare -- results/2026-11-08-sadiss.net-capacity-server-100p.json results/<a later run>.json
 ```
 
-A value of a later run is marked WORSE when it is further from good than the baseline's: a time by more than 10% of the baseline's value and by more than 5 ms, so noise on a value near zero is not a regression; a count, such as missing chunks or drops, by any amount. A value either run did not measure is never marked. When the runs differ in phones, track or target, a note says so, since their figures then need not match. The margins and the figures compared are in [`src/compare.ts`](src/compare.ts).
+A value of a later run is marked WORSE when it is further from good than the baseline's: a time by more than 10% of the baseline's value and by more than 5 ms, so noise on a value near zero is not a regression; a count, such as missing chunks, drops or server restarts, by any amount; server CPU and memory by more than 10% and more than 5 points or 5 MB. A value either run did not measure is never marked. When the runs differ in phones, track or target, a note says so, since their figures then need not match. The margins and the figures compared are in [`src/compare.ts`](src/compare.ts).
 
 ## Running against the capacity instance
 

@@ -4,6 +4,7 @@ import { RunRecord } from '../src/record'
 import { RunResult } from '../src/results'
 import { summarize, Summary } from '../src/stats'
 import { judge } from '../src/verdict'
+import { serverFigures } from '../src/serverSampler'
 
 const spread = (median: number, p1: number, p99: number): Summary => ({ count: 100, min: p1, median, p1, p95: p99, p99, max: p99 })
 
@@ -26,7 +27,10 @@ const result = (): RunResult => ({
   phrasesWithoutClock: 0,
   missingPhrases: 0,
   wrongPhrases: 0,
-  generatorDelayMs: { p99: 0.8, max: 3 }
+  generatorDelayMs: { p99: 0.8, max: 3 },
+  ...serverFigures([]),
+  serverCpuPct: spread(20, 5, 60),
+  serverRestarts: 0
 })
 
 const record = (change: (result: RunResult) => void = () => undefined, target = 'https://sadiss.net/capacity/server'): RunRecord => {
@@ -40,7 +44,9 @@ const record = (change: (result: RunResult) => void = () => undefined, target = 
     generator: { cpu: 'AMD Ryzen 7 8845HS', threads: 16, node: 'v22.23.4', platform: 'linux' },
     note: null,
     result: run,
-    verdict: judge(run)
+    verdict: judge(run),
+    serverSamples: [],
+    notSampledBecause: null
   }
 }
 
@@ -97,6 +103,17 @@ describe('comparing runs', () => {
       { value: null, worse: false },
       { value: 1300, worse: false }
     ])
+  })
+
+  it('marks the server using more CPU beyond the margin, and a restart', () => {
+    const comparison = compareRuns([record(), record((run) => ((run.serverCpuPct.p95 = 67), (run.serverRestarts = 1)))])
+    expect(row(comparison, 'Server CPU of one core p95').cells[1]?.worse).toBe(true)
+    expect(row(comparison, 'Server restarts').cells[1]?.worse).toBe(true)
+  })
+
+  it('marks nothing about the server when a run did not sample it', () => {
+    const comparison = compareRuns([record(), record((run) => Object.assign(run, serverFigures([])))])
+    expect(row(comparison, 'Server restarts').cells[1]).toEqual({ value: null, worse: false })
   })
 
   it('warns when the runs differ in phones, track or target, which makes their figures hard to compare', () => {

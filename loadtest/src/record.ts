@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { RunResult } from './results'
+import { ServerSample } from './serverSampler'
 import { Verdict } from './verdict'
 
 /** Everything a results file keeps about one run, so it can be read and compared later. */
@@ -18,6 +19,10 @@ export interface RunRecord {
   note: string | null
   result: RunResult
   verdict: Verdict
+  /** The server under test and its box, sampled every few seconds through the run. */
+  serverSamples: ServerSample[]
+  /** Why there are no server samples, or null when there are. */
+  notSampledBecause: string | null
 }
 
 /** Letters, digits, dots and dashes only, so a URL can be part of a file name. */
@@ -44,7 +49,7 @@ export const writeRecord = (folder: string, record: RunRecord) => {
 
 const isRecord = (value: unknown): value is RunRecord => {
   if (typeof value !== 'object' || value === null) return false
-  const fields = ['serverCommit', 'loadtestCommit', 'target', 'runAt', 'generator', 'note', 'result', 'verdict']
+  const fields = ['serverCommit', 'loadtestCommit', 'target', 'runAt', 'generator', 'note', 'result', 'verdict', 'serverSamples', 'notSampledBecause']
   return fields.every((field) => field in value)
 }
 

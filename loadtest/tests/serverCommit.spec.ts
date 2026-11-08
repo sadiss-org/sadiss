@@ -5,6 +5,7 @@ const CONFIG = `# comment
 CAPACITY_HOST=root@sadiss.net
 CAPACITY_DIR=/opt/sadiss-capacity
 CAPACITY_URL=https://sadiss.net/capacity
+CAPACITY_HTTP_PORT=3006
 `
 const capacity = capacityFrom(CONFIG)
 
@@ -18,7 +19,7 @@ const shell = (answers: Record<string, string>) => (command: string, args: strin
 
 describe('the commit of the server under test', () => {
   it('reads where the capacity instance lives from its config', () => {
-    expect(capacity).toEqual({ host: 'root@sadiss.net', dir: '/opt/sadiss-capacity', url: 'https://sadiss.net/capacity' })
+    expect(capacity).toEqual({ host: 'root@sadiss.net', dir: '/opt/sadiss-capacity', url: 'https://sadiss.net/capacity', httpPort: 3006 })
   })
 
   it('is the one given on the command line, whatever the target', () => {
