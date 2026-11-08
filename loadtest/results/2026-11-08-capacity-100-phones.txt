@@ -1,0 +1,26 @@
+Server commit:  ad29734a5e80c2a0c4ffd3612b0768aa6dd71553
+Load test at:   19cd8db31fcecb865c01c91dc7d4ddffbb4ad0eb
+Target:         https://sadiss.net/capacity (capacity instance, through nginx and TLS)
+Run at:         2026-11-08, Vienna evening, live instance idle
+Generator:      AMD Ryzen 7 8845HS w/ Radeon 780M Graphics, 16 threads, Node v22.23.4
+Command:        npm run loadtest -- --api https://sadiss.net/capacity/server --ws wss://sadiss.net/capacity/ws/ --phones 100
+
+100 phones, track of 30 chunks with 16 partials per frame
+Arrival before sound             median 900.88 ms, p1 688.66 ms, p95 915.5 ms, p99 918.92 ms, min 559.54 ms, max 920.85 ms (3000 values)
+Clock offset off the median      median 0.21 ms, p1 0 ms, p95 0.67 ms, p99 0.86 ms, min 0 ms, max 1.49 ms (3400 values)
+Measurement round trip           median 24.12 ms, p1 18.56 ms, p95 46.95 ms, p99 265.65 ms, min 17.53 ms, max 560.74 ms (3149 values)
+Round trips at track start       median 20, p1 19, p95 21, p99 21, min 19, max 21 (100 values)
+Missing chunks                   0
+Chunks before a clock            0
+Connects                         100
+Drops during the track           0
+Drops before the track           0
+Generator event loop             p99 0.84 ms, max 2.98 ms
+
+Arrival before sound p1          688.66 ms, at least 500 ms   pass
+Missing chunks                   0, at most 0                 pass
+Drops during the track           0, at most 0                 pass
+Clock offset off the median p99  0.86 ms, at most 10 ms       pass
+Generator event loop p99         0.84 ms, at most 20 ms       pass
+
+PASS

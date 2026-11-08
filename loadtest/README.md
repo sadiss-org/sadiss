@@ -59,6 +59,42 @@ Options, with their defaults: `--api http://127.0.0.1:3000`, `--ws ws://127.0.0.
 
 Each run uploads its own track into a new performance, named `loadtest` with the time of the run.
 
+## Running against the capacity instance
+
+The capacity instance is a second SADISS server on the production box, reached through the same nginx and TLS as the live one, at `https://sadiss.net/capacity/`, so that any commit can be measured without touching the live instance. It shares the box's Node, MongoDB and nginx with the live one and nothing else. A run there loads the box the live instance runs on, so **never run one while a performance is live**.
+
+| What | Where |
+| --- | --- |
+| Server (`dist/`, `node_modules`, `.env`; no git checkout) | `/opt/sadiss-capacity/server` |
+| The commit it runs | `/opt/sadiss-capacity/DEPLOYED.txt` |
+| PM2 app | `sadiss-capacity`, ports 3006 (HTTP) and 40001 (WebSockets) |
+| MongoDB | database `sadiss_capacity`, user `capacity` with readWrite on it only |
+| Uploads and chunks | `/mnt/HC_Volume_33896583/capacity/` |
+| Secrets: database password, session and JWT secrets, the load test's admin login | `/root/.sadiss-capacity`, mode 600 |
+| nginx routes `/capacity/server/` and `/capacity/ws/` | `/etc/nginx/forge-conf/sadiss.org/server/capacity.conf`, included by the `sadiss.org` server block |
+
+The paths and ports are set in [`capacity/config.sh`](capacity/config.sh); `install-nginx.sh` fills the ports into [`capacity/nginx.conf`](capacity/nginx.conf).
+
+Once, to set it up:
+
+```sh
+loadtest/capacity/setup.sh               # folders, secrets, MongoDB user and .env on the box
+loadtest/capacity/deploy.sh HEAD         # build and start the server
+loadtest/capacity/install-nginx.sh       # add its nginx routes, reload nginx, run the smoke test
+```
+
+To test another commit, `loadtest/capacity/deploy.sh <commit>` builds the server at that commit on this machine, installs it on the capacity instance with that commit's dependencies and restarts only that instance. The first deploy needs a commit from c0884dd6 on, which brings the script that creates the load test's admin login; later deploys of older commits use the login that one created. `DEPLOYED.txt` names the commit and has a line for each step that finished (copied, installed, answered), so a deploy that stopped part-way shows where.
+
+A run, with the admin login read from the box:
+
+```sh
+cd loadtest
+eval "$(ssh root@sadiss.net "sed -n 's/^ADMIN_/export SADISS_ADMIN_/p' /root/.sadiss-capacity")"
+npm run loadtest -- --api https://sadiss.net/capacity/server --ws wss://sadiss.net/capacity/ws/ --phones 100
+```
+
+To remove it: `loadtest/capacity/remove.sh`. It asks first, then deletes the nginx routes, the PM2 app, the database and its user, the folders, the data and the secrets.
+
 ## Tests
 
 ```sh
