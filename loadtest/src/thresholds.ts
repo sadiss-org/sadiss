@@ -1,4 +1,5 @@
 import { RunResult } from './results'
+import { TrackShape } from './track'
 
 /** The fields of an object that hold a number, or a number the run may not have measured. */
 type NumberFields<T> = { [K in keyof T]-?: T[K] extends number | null ? K : never }[keyof T]
@@ -52,3 +53,16 @@ export const THRESHOLDS: readonly Threshold[] = [
     reason: 'the load generator fell behind, so this run says nothing about the server.'
   }
 ]
+
+/** What a run of a track with phrases must also meet: phrases are held to the same rules as chunks. */
+export const PHRASE_THRESHOLDS: readonly Threshold[] = [
+  // 99% of phrases reach their phone at least 500 ms before they have to be spoken.
+  { figure: 'phraseLeadMs', statistic: 'p1', bound: 'atLeast', limit: 500, consequence: 'fail' },
+  // Every phone hears every phrase of its voice.
+  { figure: 'missingPhrases', bound: 'atMost', limit: 0, consequence: 'fail' },
+  // No phone is sent a phrase of another voice or language.
+  { figure: 'wrongPhrases', bound: 'atMost', limit: 0, consequence: 'fail' }
+]
+
+/** The thresholds a run of this track is judged by. */
+export const thresholdsFor = (track: TrackShape): readonly Threshold[] => (track.tts ? [...THRESHOLDS, ...PHRASE_THRESHOLDS] : THRESHOLDS)

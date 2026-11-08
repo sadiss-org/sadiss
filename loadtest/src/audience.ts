@@ -23,10 +23,10 @@ export const createAudience = (): Audience => {
   }
 }
 
-/** Lets `count` phones join one after another, spread evenly over `overMs`. */
-export const joinGradually = async (audience: Audience, count: number, overMs: number, phoneFor: (index: number) => PhoneOptions) => {
-  for (let index = 0; index < count; index++) {
-    audience.join(phoneFor(index))
-    await sleep(overMs / count)
+/** Lets the given phones join one after another, spread evenly over `overMs`. */
+export const joinGradually = async (audience: Audience, phones: readonly PhoneOptions[], overMs: number) => {
+  for (const phone of phones) {
+    audience.join(phone)
+    await sleep(overMs / phones.length)
   }
 }

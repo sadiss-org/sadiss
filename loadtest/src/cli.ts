@@ -26,10 +26,16 @@ const count = (value: number | null) => (value === null ? '-' : String(Math.roun
 /** How each figure of a run is named and shown, in the figure lines and in the check lines alike. */
 const FIGURES: Record<keyof RunResult, { label: string; unit: (value: number | null) => string }> = {
   phones: { label: 'Phones', unit: count },
+  latePhones: { label: 'Phones joined during the track', unit: count },
   track: { label: 'Track', unit: count },
   chunkCount: { label: 'Chunks in the track', unit: count },
   arrivalLeadMs: { label: 'Arrival before sound', unit: ms },
   offsetFromMedianMs: { label: 'Clock offset off the median', unit: ms },
+  lateOffsetFromMedianMs: { label: 'Late phones off the median', unit: ms },
+  phraseLeadMs: { label: 'Phrase before its time', unit: ms },
+  phrasesWithoutClock: { label: 'Phrases before a clock', unit: count },
+  missingPhrases: { label: 'Missing phrases', unit: count },
+  wrongPhrases: { label: 'Wrong phrases', unit: count },
   roundTripMs: { label: 'Measurement round trip', unit: ms },
   roundTripsAtStart: { label: 'Round trips at track start', unit: count },
   missingChunks: { label: 'Missing chunks', unit: count },
@@ -72,12 +78,30 @@ try {
   process.exit(1)
 }
 
+const { track } = result
+const trackLine = [
+  `${result.phones} phones, ${result.latePhones} of them joined during the track`,
+  track.choir
+    ? `choir track of ${result.chunkCount} chunks with ${track.partialsPerFrame} voices`
+    : `track of ${result.chunkCount} chunks with ${track.partialsPerFrame} partials per frame`,
+  ...(track.tts ? [`a phrase every ${track.tts.everySeconds} s in ${track.tts.langs.join(', ')}`] : [])
+].join(', ')
+const phraseLines = track.tts
+  ? [
+      summaryLine('phraseLeadMs', result.phraseLeadMs),
+      countLine('missingPhrases', result.missingPhrases),
+      countLine('wrongPhrases', result.wrongPhrases),
+      countLine('phrasesWithoutClock', result.phrasesWithoutClock)
+    ]
+  : []
+
 const verdict = judge(result)
 console.log(
   [
-    `${result.phones} phones, track of ${result.chunkCount} chunks with ${result.track.partialsPerFrame} partials per frame`,
+    trackLine,
     summaryLine('arrivalLeadMs', result.arrivalLeadMs),
     summaryLine('offsetFromMedianMs', result.offsetFromMedianMs),
+    summaryLine('lateOffsetFromMedianMs', result.lateOffsetFromMedianMs),
     summaryLine('roundTripMs', result.roundTripMs),
     summaryLine('roundTripsAtStart', result.roundTripsAtStart),
     countLine('missingChunks', result.missingChunks),
@@ -85,6 +109,7 @@ console.log(
     countLine('connects', result.connects),
     countLine('dropsDuringTrack', result.dropsDuringTrack),
     countLine('dropsBeforeTrack', result.dropsBeforeTrack),
+    ...phraseLines,
     `${FIGURES.generatorDelayMs.label.padEnd(LABEL_WIDTH)} p99 ${ms(result.generatorDelayMs.p99)}, max ${ms(result.generatorDelayMs.max)}`,
     '',
     ...verdict.checks.map(checkLine),

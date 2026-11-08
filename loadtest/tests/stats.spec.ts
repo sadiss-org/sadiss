@@ -14,22 +14,26 @@ describe('a summary of measured values', () => {
 
 describe('how far each phone’s clock offset is from the median of all phones', () => {
   it('is each offset’s distance from the median', () => {
-    expect(distancesFromMedian([1000, 1002, 1007])).toEqual([2, 0, 5])
+    expect(distancesFromMedian([1000, 1002, 1007]).distances).toEqual([2, 0, 5])
   })
 
   it('leaves out phones that have no offset yet', () => {
-    expect(distancesFromMedian([null, 1000, 1004])).toEqual([2, 2])
+    expect(distancesFromMedian([null, 1000, 1004]).distances).toEqual([2, 2])
   })
 
   it('is empty with fewer than the minimum of phones that have an offset, and is not at the minimum', () => {
     const offsets = (n: number) => Array.from({ length: n }, (_, i) => 1000 + i)
-    expect(distancesFromMedian([null, ...offsets(MIN_PHONES - 1)])).toEqual([])
-    expect(distancesFromMedian([null, ...offsets(MIN_PHONES)])).toHaveLength(MIN_PHONES)
+    expect(distancesFromMedian([null, ...offsets(MIN_PHONES - 1)], [1000])).toEqual({ distances: [], others: [] })
+    expect(distancesFromMedian([null, ...offsets(MIN_PHONES)]).distances).toHaveLength(MIN_PHONES)
+  })
+
+  it('measures other phones against the same median without moving it, and leaves out those without an offset', () => {
+    expect(distancesFromMedian([1000, 1002, 1004], [1030, null, 990])).toEqual({ distances: [2, 0, 2], others: [28, 12] })
   })
 
   it('does not grow with the number of phones when every phone is as far off as before', () => {
     const few = [999, 1001]
     const many = Array.from({ length: 200 }, (_, i) => (i % 2 ? 1001 : 999))
-    expect(summarize(distancesFromMedian(many)).p99).toBe(summarize(distancesFromMedian(few)).p99)
+    expect(summarize(distancesFromMedian(many).distances).p99).toBe(summarize(distancesFromMedian(few).distances).p99)
   })
 })
