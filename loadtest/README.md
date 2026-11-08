@@ -64,7 +64,7 @@ npm install
 SADISS_ADMIN_EMAIL=loadtest@example.invalid SADISS_ADMIN_PASSWORD=<the same> npm run loadtest -- --phones 10 --seconds 30
 ```
 
-Options, with their defaults: `--api http://127.0.0.1:3000`, `--ws ws://127.0.0.1:8080`, `--phones 10`, `--seconds 30` (track length), `--partials 16` (partials per frame; in nonChoir mode the server shares them out over the phones, at most 16 each), `--voices` (choir mode with this many voices, one partial each; not together with `--partials`), `--langs` (phrases in these ISO codes, separated by commas, such as `en-US,de-DE`), `--phrase-every 4` (seconds between a voice's phrases, at least 1, since the server keeps one phrase per voice and chunk), `--join-over 5` (seconds over which the phones that join before the track do so), `--late-share 0.1` (the share of phones that join during the first half of the track) and `--settle 60` (seconds the phones measure their clocks before the track starts). A value that is not a number is refused, and so is `--phones` below 2, or a late share that leaves fewer than 2 phones joining before the track, since the offset from the median needs at least two phones (`MIN_PHONES` in [`src/stats.ts`](src/stats.ts)).
+Options, with their defaults: `--api http://127.0.0.1:3000`, `--ws ws://127.0.0.1:8080`, `--phones 10`, `--seconds 30` (track length), `--partials 16` (partials per frame; in nonChoir mode the server shares them out over the phones, at most 16 each), `--voices` (choir mode with this many voices, one partial each; not together with `--partials`), `--langs` (phrases in these ISO codes, separated by commas, such as `en-US,de-DE`), `--phrase-every 4` (seconds between a voice's phrases, at least 1, since the server keeps one phrase per voice and chunk), `--join-over 5` (seconds over which the phones that join before the track do so), `--late-share 0.1` (the share of phones that join during the first half of the track), `--settle 60` (seconds the phones measure their clocks before the track starts), `--server-commit` (the commit the server under test runs, when it cannot be found; see below) and `--note` (a few words kept with the run, such as what else ran on the box). A value that is not a number is refused, and so is `--phones` below 2, or a late share that leaves fewer than 2 phones joining before the track, since the offset from the median needs at least two phones (`MIN_PHONES` in [`src/stats.ts`](src/stats.ts)).
 
 A choir run with phrases:
 
@@ -73,6 +73,20 @@ npm run loadtest -- --phones 20 --voices 4 --langs en-US,de-DE --phrase-every 3 
 ```
 
 Each run uploads its own track into a new performance, named `loadtest` with the time of the run.
+
+## Results files and comparing runs
+
+Every run that reaches a verdict keeps a results file in [`results/`](results/), named by when it started (UTC), the target and the number of phones, such as `2026-11-08T1930Z-sadiss.net-capacity-server-100p.json`. It holds the commit of the server under test, the commit of the load test, the target, the time, the machine the generator ran on, the note, every figure and the verdict, with the figures named as the summary names them ([`src/figures.ts`](src/figures.ts)). Commit the files of runs worth keeping.
+
+The server does not report its commit, so the run finds it: for the capacity instance, the first line of its `DEPLOYED.txt` over ssh, with a warning when that deploy did not finish; for a server on this machine, this checkout's commit, with `-dirty` when `server/` has uncommitted changes. For any other server, or when that fails, the run warns and keeps the commit as unknown unless `--server-commit` gives it.
+
+To put runs side by side, the first as the baseline:
+
+```sh
+npm run compare -- results/2026-11-08-sadiss.net-capacity-server-100p.json results/<a later run>.json
+```
+
+A value of a later run is marked WORSE when it is further from good than the baseline's: a time by more than 10% of the baseline's value and by more than 5 ms, so noise on a value near zero is not a regression; a count, such as missing chunks or drops, by any amount. A value either run did not measure is never marked. When the runs differ in phones, track or target, a note says so, since their figures then need not match. The margins and the figures compared are in [`src/compare.ts`](src/compare.ts).
 
 ## Running against the capacity instance
 

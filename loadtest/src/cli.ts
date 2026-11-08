@@ -1,6 +1,11 @@
+import { cpus } from 'node:os'
+import { fileURLToPath } from 'node:url'
+import { FIGURES, ms } from './figures'
 import { parseOptions } from './options'
+import { writeRecord } from './record'
 import { RunResult } from './results'
 import { runFixed } from './run'
+import { checkoutCommit, findServerCommit, readCapacity, runCommand } from './serverCommit'
 import { Summary } from './stats'
 import { Threshold } from './thresholds'
 import { judge, Verdict } from './verdict'
@@ -18,32 +23,6 @@ try {
 } catch (error) {
   console.error(error instanceof Error ? error.message : error)
   process.exit(2)
-}
-
-const ms = (value: number | null) => (value === null ? '-' : `${Number(value.toFixed(2))} ms`)
-const count = (value: number | null) => (value === null ? '-' : String(Math.round(value)))
-
-/** How each figure of a run is named and shown, in the figure lines and in the check lines alike. */
-const FIGURES: Record<keyof RunResult, { label: string; unit: (value: number | null) => string }> = {
-  phones: { label: 'Phones', unit: count },
-  latePhones: { label: 'Phones joined during the track', unit: count },
-  track: { label: 'Track', unit: count },
-  chunkCount: { label: 'Chunks in the track', unit: count },
-  arrivalLeadMs: { label: 'Arrival before sound', unit: ms },
-  offsetFromMedianMs: { label: 'Clock offset off the median', unit: ms },
-  lateOffsetFromMedianMs: { label: 'Late phones off the median', unit: ms },
-  phraseLeadMs: { label: 'Phrase before its time', unit: ms },
-  phrasesWithoutClock: { label: 'Phrases before a clock', unit: count },
-  missingPhrases: { label: 'Missing phrases', unit: count },
-  wrongPhrases: { label: 'Wrong phrases', unit: count },
-  roundTripMs: { label: 'Measurement round trip', unit: ms },
-  roundTripsAtStart: { label: 'Round trips at track start', unit: count },
-  missingChunks: { label: 'Missing chunks', unit: count },
-  arrivalsWithoutClock: { label: 'Chunks before a clock', unit: count },
-  connects: { label: 'Connects', unit: count },
-  dropsDuringTrack: { label: 'Drops during the track', unit: count },
-  dropsBeforeTrack: { label: 'Drops before the track', unit: count },
-  generatorDelayMs: { label: 'Generator event loop', unit: ms }
 }
 
 const LABEL_WIDTH = 32
@@ -69,6 +48,10 @@ const OUTCOMES: Record<Verdict['outcome'], (verdict: Verdict) => string> = {
   fail: () => 'FAIL: the server missed a threshold.',
   invalid: (verdict) => `INVALID: ${verdict.invalidBecause.join(' ')}`
 }
+
+const runAt = new Date().toISOString()
+const serverCommit = findServerCommit({ apiUrl: options.apiUrl, given: options.serverCommit, capacity: readCapacity(), run: runCommand })
+if (serverCommit.warning) console.warn(serverCommit.warning)
 
 let result
 try {
@@ -117,4 +100,17 @@ console.log(
     OUTCOMES[verdict.outcome](verdict)
   ].join('\n')
 )
+
+const path = writeRecord(fileURLToPath(new URL('../results', import.meta.url)), {
+  serverCommit: serverCommit.commit,
+  // The results folder is left out: every run adds an untracked file to it.
+  loadtestCommit: checkoutCommit(runCommand, ['.', ':(exclude)results']),
+  target: { apiUrl: options.apiUrl, wsUrl: options.wsUrl },
+  runAt,
+  note: options.note,
+  generator: { cpu: cpus()[0]?.model.trim() ?? 'unknown', threads: cpus().length, node: process.version, platform: process.platform },
+  result,
+  verdict
+})
+console.log(`\nKept in ${path}`)
 process.exitCode = EXIT_CODES[verdict.outcome]
