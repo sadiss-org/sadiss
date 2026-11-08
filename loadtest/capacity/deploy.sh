@@ -28,8 +28,13 @@ echo "Building the server at $sha."
   npx tsc
 )
 
+# DEPLOYED.txt names the commit before its files are copied, then gains a line
+# for each step that finished: copied, installed, answered. A deploy that
+# stopped part-way shows where.
+ssh -o BatchMode=yes "$CAPACITY_HOST" "printf '%s\\n' $sha >$CAPACITY_DIR/DEPLOYED.txt"
 rsync -az --delete "$work/server/dist/" "$CAPACITY_HOST:$CAPACITY_DIR/server/dist/"
 rsync -az "$work/server/package.json" "$work/server/package-lock.json" "$CAPACITY_HOST:$CAPACITY_DIR/server/"
+ssh -o BatchMode=yes "$CAPACITY_HOST" "printf 'copied %s\\n' $(date -u +%Y-%m-%dT%H:%M:%SZ) >>$CAPACITY_DIR/DEPLOYED.txt"
 
 start() {
   local sha=$1
@@ -39,6 +44,7 @@ start() {
     exit 1
   fi
   MONGOMS_DISABLE_POSTINSTALL=1 npm ci --omit=dev --legacy-peer-deps --no-audit --no-fund --loglevel=error
+  printf 'installed %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$CAPACITY_DIR/DEPLOYED.txt"
 
   # Started the way PM2 starts the live instance: yarn start in the server folder.
   if pm2 describe "$CAPACITY_APP" >/dev/null 2>&1; then
@@ -59,13 +65,20 @@ start() {
     exit 1
   fi
 
-  # An admin account for the load test; one that exists is left unchanged.
-  (
-    . "$CAPACITY_SECRETS"
-    ADMIN_EMAIL=$ADMIN_EMAIL ADMIN_PASSWORD=$ADMIN_PASSWORD node dist/scripts/createAdmin.js
-  )
+  printf 'answered %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$CAPACITY_DIR/DEPLOYED.txt"
 
-  printf '%s\ndeployed %s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$CAPACITY_DIR/DEPLOYED.txt"
+  # An admin account for the load test; one that exists is left unchanged.
+  # Commits before the script existed rely on the account an earlier deploy
+  # created in the same database.
+  if [ -f dist/scripts/createAdmin.js ]; then
+    (
+      . "$CAPACITY_SECRETS"
+      ADMIN_EMAIL=$ADMIN_EMAIL ADMIN_PASSWORD=$ADMIN_PASSWORD node dist/scripts/createAdmin.js
+    )
+  else
+    echo "This commit has no createAdmin script; the load test needs the account an earlier deploy created."
+  fi
+
   echo "$CAPACITY_APP runs $sha."
 }
 

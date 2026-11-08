@@ -2,7 +2,9 @@
 # Prepares the capacity instance on the production box: its folders, its
 # secrets, its MongoDB user and its .env. Touches nothing of the live
 # instance. Safe to run again: secrets and the database user are kept, the
-# .env is written anew from config.sh and the secrets.
+# .env is written anew from config.sh and the secrets. Stops if the database
+# user exists but its secrets file is gone, since new secrets would not match
+# the user's password.
 #
 # Run from anywhere: loadtest/capacity/setup.sh
 set -euo pipefail
@@ -15,9 +17,15 @@ setup() {
     exit 1
   fi
 
-  mkdir -p "$CAPACITY_DIR/server" "$CAPACITY_DATA/chunks" "$CAPACITY_DATA/uploads"
+  local user_exists
+  user_exists=$(mongosh_admin "$CAPACITY_DB" --eval "print(db.getUser('$CAPACITY_DB_USER') ? 'yes' : 'no')")
 
   if [ ! -f "$CAPACITY_SECRETS" ]; then
+    if [ "$user_exists" = yes ]; then
+      echo "MongoDB user $CAPACITY_DB_USER exists but $CAPACITY_SECRETS is gone, so new secrets would not match its password." >&2
+      echo "Restore the file, or remove the instance with loadtest/capacity/remove.sh and set it up again." >&2
+      exit 1
+    fi
     (
       umask 077
       {
@@ -32,16 +40,26 @@ setup() {
   fi
   . "$CAPACITY_SECRETS"
 
-  local admin_user admin_pw
-  admin_user=$(sed -n 's/^admin user: *//p' /root/.mongo-admin)
-  admin_pw=$(sed -n 's/^password: *//p' /root/.mongo-admin)
-  CAPACITY_MONGO_PW=$MONGO_PW mongosh --quiet -u "$admin_user" -p "$admin_pw" --authenticationDatabase admin "$CAPACITY_DB" --eval "
-    if (db.getUser('$CAPACITY_DB_USER')) {
-      print('MongoDB user $CAPACITY_DB_USER exists already; left unchanged.')
-    } else {
-      db.createUser({ user: '$CAPACITY_DB_USER', pwd: process.env.CAPACITY_MONGO_PW, roles: [{ role: 'readWrite', db: '$CAPACITY_DB' }] })
-      print('Created MongoDB user $CAPACITY_DB_USER for $CAPACITY_DB.')
-    }"
+  if [ "$user_exists" = yes ]; then
+    echo "MongoDB user $CAPACITY_DB_USER exists already; left unchanged."
+  else
+    CAPACITY_MONGO_PW=$MONGO_PW mongosh_admin "$CAPACITY_DB" --eval "
+      db.createUser({ user: '$CAPACITY_DB_USER', pwd: process.env.CAPACITY_MONGO_PW, roles: [{ role: 'readWrite', db: '$CAPACITY_DB' }] })"
+    echo "Created MongoDB user $CAPACITY_DB_USER for $CAPACITY_DB."
+  fi
+
+  # The server joins UPLOADS_DIR onto its own folder in places, so the data
+  # folders are reached through links there, as on the live instance.
+  mkdir -p "$CAPACITY_DIR/server" "$CAPACITY_DATA/chunks" "$CAPACITY_DATA/uploads"
+  local dir link
+  for dir in uploads chunks; do
+    link=$CAPACITY_DIR/server/$dir
+    if [ -e "$link" ] && [ ! -L "$link" ]; then
+      echo "$link is a real folder, not a link to $CAPACITY_DATA/$dir; move its contents there and remove it." >&2
+      exit 1
+    fi
+    ln -sfn "$CAPACITY_DATA/$dir" "$link"
+  done
 
   (
     umask 077
@@ -57,8 +75,8 @@ WS_SERVER_URL='localhost'
 WS_SERVER_PORT='$CAPACITY_WS_PORT'
 SESSION_SECRET='$SESSION_SECRET'
 JWT_SECRET='$JWT_SECRET'
-UPLOADS_DIR='$CAPACITY_DATA/uploads'
-CHUNKS_DIR='$CAPACITY_DATA/chunks'
+UPLOADS_DIR='uploads'
+CHUNKS_DIR='chunks'
 ENV
   )
   echo "Wrote $CAPACITY_DIR/server/.env."

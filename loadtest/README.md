@@ -73,7 +73,7 @@ The capacity instance is a second SADISS server on the production box, reached t
 | Secrets: database password, session and JWT secrets, the load test's admin login | `/root/.sadiss-capacity`, mode 600 |
 | nginx routes `/capacity/server/` and `/capacity/ws/` | `/etc/nginx/forge-conf/sadiss.org/server/capacity.conf`, included by the `sadiss.org` server block |
 
-The paths and ports are set in [`capacity/config.sh`](capacity/config.sh); [`capacity/nginx.conf`](capacity/nginx.conf) repeats the ports.
+The paths and ports are set in [`capacity/config.sh`](capacity/config.sh); `install-nginx.sh` fills the ports into [`capacity/nginx.conf`](capacity/nginx.conf).
 
 Once, to set it up:
 
@@ -83,7 +83,7 @@ loadtest/capacity/deploy.sh HEAD         # build and start the server
 loadtest/capacity/install-nginx.sh       # add its nginx routes, reload nginx, run the smoke test
 ```
 
-To test another commit, `loadtest/capacity/deploy.sh <commit>` builds the server at that commit on this machine, installs it on the capacity instance with that commit's dependencies and restarts only that instance.
+To test another commit, `loadtest/capacity/deploy.sh <commit>` builds the server at that commit on this machine, installs it on the capacity instance with that commit's dependencies and restarts only that instance. The first deploy needs a commit from c0884dd6 on, which brings the script that creates the load test's admin login; later deploys of older commits use the login that one created. `DEPLOYED.txt` names the commit and has a line for each step that finished (copied, installed, answered), so a deploy that stopped part-way shows where.
 
 A run, with the admin login read from the box:
 
@@ -93,14 +93,7 @@ eval "$(ssh root@sadiss.net "sed -n 's/^ADMIN_/export SADISS_ADMIN_/p' /root/.sa
 npm run loadtest -- --api https://sadiss.net/capacity/server --ws wss://sadiss.net/capacity/ws/ --phones 100
 ```
 
-To remove it, on the box:
-
-```sh
-rm /etc/nginx/forge-conf/sadiss.org/server/capacity.conf && nginx -t && systemctl reload nginx && /opt/smoke.sh
-pm2 delete sadiss-capacity && pm2 save
-mongosh -u admin -p --authenticationDatabase admin sadiss_capacity --eval 'db.dropUser("capacity"); db.dropDatabase()'
-rm -r /opt/sadiss-capacity /mnt/HC_Volume_33896583/capacity /root/.sadiss-capacity
-```
+To remove it: `loadtest/capacity/remove.sh`. It asks first, then deletes the nginx routes, the PM2 app, the database and its user, the folders, the data and the secrets.
 
 ## Tests
 
