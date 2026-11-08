@@ -6,6 +6,7 @@ import { writeRecord } from './record'
 import { RunResult } from './results'
 import { runFixed } from './run'
 import { checkoutCommit, findServerCommit, readCapacity, runCommand } from './serverCommit'
+import { samplingTarget } from './serverSampler'
 import { Summary } from './stats'
 import { Threshold } from './thresholds'
 import { judge, Verdict } from './verdict'
@@ -50,17 +51,19 @@ const OUTCOMES: Record<Verdict['outcome'], (verdict: Verdict) => string> = {
 }
 
 const runAt = new Date().toISOString()
-const serverCommit = findServerCommit({ apiUrl: options.apiUrl, given: options.serverCommit, capacity: readCapacity(), run: runCommand })
+const capacity = readCapacity()
+const serverCommit = findServerCommit({ apiUrl: options.apiUrl, given: options.serverCommit, capacity, run: runCommand })
 if (serverCommit.warning) console.warn(serverCommit.warning)
 
-let result
+let run
 try {
-  result = await runFixed(options, { email, password }, (message) => console.warn(message))
+  run = await runFixed(options, { email, password }, (message) => console.warn(message), samplingTarget(options.apiUrl, capacity))
 } catch (error) {
   console.error(error instanceof Error ? error.message : error)
   process.exit(1)
 }
 
+const { result, server } = run
 const { track } = result
 const trackLine = [
   `${result.phones} phones, ${result.latePhones} of them joined during the track`,
@@ -78,6 +81,17 @@ const phraseLines = track.tts
     ]
   : []
 
+const serverLines = server.notSampledBecause
+  ? [`${'Server'.padEnd(LABEL_WIDTH)} not sampled: ${server.notSampledBecause}`]
+  : [
+      summaryLine('serverCpuPct', result.serverCpuPct),
+      summaryLine('serverRssMb', result.serverRssMb),
+      summaryLine('serverSockets', result.serverSockets),
+      countLine('serverRestarts', result.serverRestarts ?? 0),
+      summaryLine('boxLoad', result.boxLoad),
+      summaryLine('boxAvailableMb', result.boxAvailableMb)
+    ]
+
 const verdict = judge(result)
 console.log(
   [
@@ -93,6 +107,7 @@ console.log(
     countLine('dropsDuringTrack', result.dropsDuringTrack),
     countLine('dropsBeforeTrack', result.dropsBeforeTrack),
     ...phraseLines,
+    ...serverLines,
     `${FIGURES.generatorDelayMs.label.padEnd(LABEL_WIDTH)} p99 ${ms(result.generatorDelayMs.p99)}, max ${ms(result.generatorDelayMs.max)}`,
     '',
     ...verdict.checks.map(checkLine),
@@ -110,7 +125,9 @@ const path = writeRecord(fileURLToPath(new URL('../results', import.meta.url)), 
   note: options.note,
   generator: { cpu: cpus()[0]?.model.trim() ?? 'unknown', threads: cpus().length, node: process.version, platform: process.platform },
   result,
-  verdict
+  verdict,
+  serverSamples: server.samples,
+  notSampledBecause: server.notSampledBecause
 })
 console.log(`\nKept in ${path}`)
 process.exitCode = EXIT_CODES[verdict.outcome]

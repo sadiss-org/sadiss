@@ -3,9 +3,10 @@ import { CHUNK_SECONDS } from '@server/types/ChunkEnvelope'
 import { distancesFromMedian, summarize, Summary } from './stats'
 import { phrases, phraseText, TrackShape } from './track'
 import { Audience } from './audience'
+import { ServerFigures } from './serverSampler'
 import { VirtualPhone } from './virtualPhone'
 
-export interface RunResult {
+export interface RunResult extends ServerFigures {
   phones: number
   /** Phones that joined during the track. */
   latePhones: number
@@ -108,7 +109,7 @@ export const watch = (audience: Audience, now: () => number = () => performance.
     /** Stops watching without a result, such as when the run failed. */
     stop,
     /** Stops watching and sums up what every phone saw. */
-    finish: (track: TrackShape, chunkCount: number): RunResult => {
+    finish: (track: TrackShape, chunkCount: number): Omit<RunResult, keyof ServerFigures> => {
       stop()
       const phones = audience.phones
       const arrivals = phones.flatMap((phone) => phone.arrivals)

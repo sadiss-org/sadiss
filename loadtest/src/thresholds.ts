@@ -9,7 +9,7 @@ type NumberFields<T> = { [K in keyof T]-?: T[K] extends number | null ? K : neve
  * one statistic of a figure that holds several.
  */
 export type Reading = {
-  [F in keyof RunResult]: RunResult[F] extends number
+  [F in keyof RunResult]: RunResult[F] extends number | null
     ? { figure: F; statistic?: undefined }
     : { figure: F; statistic: NumberFields<RunResult[F]> }
 }[keyof RunResult]

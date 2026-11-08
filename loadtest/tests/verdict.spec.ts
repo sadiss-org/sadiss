@@ -3,6 +3,7 @@ import { RunResult } from '../src/results'
 import { summarize } from '../src/stats'
 import { PHRASE_THRESHOLDS, Threshold, THRESHOLDS } from '../src/thresholds'
 import { judge } from '../src/verdict'
+import { serverFigures } from '../src/serverSampler'
 
 const empty = summarize([])
 
@@ -26,7 +27,8 @@ const healthy = (): RunResult => ({
   phrasesWithoutClock: 0,
   missingPhrases: 0,
   wrongPhrases: 0,
-  generatorDelayMs: { p99: 1.5, max: 4 }
+  generatorDelayMs: { p99: 1.5, max: 4 },
+  ...serverFigures([])
 })
 
 /** One result per threshold, just across its limit, with the figure the failing check must name. */

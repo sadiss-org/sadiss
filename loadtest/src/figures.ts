@@ -2,6 +2,9 @@ import { RunResult } from './results'
 
 export const ms = (value: number | null) => (value === null ? '-' : `${Number(value.toFixed(2))} ms`)
 export const count = (value: number | null) => (value === null ? '-' : String(Math.round(value)))
+const percent = (value: number | null) => (value === null ? '-' : `${Number(value.toFixed(1))}%`)
+const mb = (value: number | null) => (value === null ? '-' : `${Number(value.toFixed(1))} MB`)
+const plain = (value: number | null) => (value === null ? '-' : String(Number(value.toFixed(2))))
 
 /** How each figure of a run is named and shown, in the figure lines, the check lines and the comparison of runs alike. */
 export const FIGURES: Record<keyof RunResult, { label: string; unit: (value: number | null) => string }> = {
@@ -23,5 +26,11 @@ export const FIGURES: Record<keyof RunResult, { label: string; unit: (value: num
   connects: { label: 'Connects', unit: count },
   dropsDuringTrack: { label: 'Drops during the track', unit: count },
   dropsBeforeTrack: { label: 'Drops before the track', unit: count },
-  generatorDelayMs: { label: 'Generator event loop', unit: ms }
+  generatorDelayMs: { label: 'Generator event loop', unit: ms },
+  serverCpuPct: { label: 'Server CPU of one core', unit: percent },
+  serverRssMb: { label: 'Server memory', unit: mb },
+  serverSockets: { label: 'Server open sockets', unit: count },
+  serverRestarts: { label: 'Server restarts', unit: count },
+  boxLoad: { label: 'Box load', unit: plain },
+  boxAvailableMb: { label: 'Box memory available', unit: mb }
 }

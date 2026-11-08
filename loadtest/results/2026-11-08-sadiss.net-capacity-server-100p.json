@@ -88,6 +88,52 @@
     "generatorDelayMs": {
       "p99": 0.84,
       "max": 2.98
+    },
+    "serverCpuPct": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "serverRssMb": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "serverSockets": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "serverRestarts": null,
+    "boxLoad": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "boxAvailableMb": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
     }
   },
   "verdict": {
@@ -149,5 +195,7 @@
       }
     ],
     "invalidBecause": []
-  }
+  },
+  "serverSamples": [],
+  "notSampledBecause": "the run was made before the load test sampled the server."
 }

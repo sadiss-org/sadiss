@@ -6,6 +6,7 @@ import { readRecord, recordFileName, writeRecord } from '../src/record'
 import { RunResult } from '../src/results'
 import { summarize } from '../src/stats'
 import { judge } from '../src/verdict'
+import { serverFigures } from '../src/serverSampler'
 
 const empty = summarize([])
 const run: RunResult = {
@@ -27,7 +28,8 @@ const run: RunResult = {
   phrasesWithoutClock: 0,
   missingPhrases: 0,
   wrongPhrases: 0,
-  generatorDelayMs: { p99: 0.8, max: 3 }
+  generatorDelayMs: { p99: 0.8, max: 3 },
+  ...serverFigures([])
 }
 
 const record = {
@@ -38,7 +40,9 @@ const record = {
   generator: { cpu: 'AMD Ryzen 7 8845HS', threads: 16, node: 'v22.23.4', platform: 'linux' },
   note: 'live instance idle',
   result: run,
-  verdict: judge(run)
+  verdict: judge(run),
+  serverSamples: [{ atS: 0, pid: 42, cpuPct: null, rssMb: 200, sockets: 120, boxLoad: 0.42, boxAvailableMb: 6383.21 }],
+  notSampledBecause: null
 }
 
 describe('the results file of a run', () => {

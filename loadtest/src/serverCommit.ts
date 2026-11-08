@@ -6,16 +6,18 @@ export interface Capacity {
   host: string
   dir: string
   url: string
+  /** The port its server's HTTP API listens on, behind nginx. */
+  httpPort: number
 }
 
-/** Reads the capacity instance's ssh host, folder and URL from the text of `capacity/config.sh`. */
+/** Reads the capacity instance's ssh host, folder, URL and HTTP port from the text of `capacity/config.sh`. */
 export const capacityFrom = (config: string): Capacity => {
   const value = (name: string) => {
     const found = new RegExp(`^${name}=(.*)$`, 'm').exec(config)?.[1]
     if (found === undefined) throw new Error(`capacity/config.sh sets no ${name}.`)
     return found.trim()
   }
-  return { host: value('CAPACITY_HOST'), dir: value('CAPACITY_DIR'), url: value('CAPACITY_URL') }
+  return { host: value('CAPACITY_HOST'), dir: value('CAPACITY_DIR'), url: value('CAPACITY_URL'), httpPort: Number(value('CAPACITY_HTTP_PORT')) }
 }
 
 export const readCapacity = () => capacityFrom(readFileSync(new URL('../capacity/config.sh', import.meta.url), 'utf-8'))
@@ -35,7 +37,8 @@ export const checkoutCommit = (run: Run, pathspecs: string[]) => {
   }
 }
 
-const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
+/** Host names of a server on this machine. */
+export const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
 
 const UNKNOWN = 'Pass --server-commit to keep it in the results file.'
 
