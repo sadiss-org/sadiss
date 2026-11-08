@@ -14,16 +14,21 @@ type Reading = {
 }[keyof RunResult]
 
 /**
- * One rule a run is judged by. A run whose value is on the wrong side of the
- * limit fails the check; its consequence says whether that makes the run fail
- * or makes it invalid, which means the load generator, not the server, fell
- * behind and the run says nothing about the server.
+ * What a failed check does to the run: it makes the run fail, or it makes it
+ * invalid, which means the load test itself could not measure the server, and
+ * the reason says why in words printed after "INVALID: ".
  */
-export type Threshold = Reading & {
-  bound: 'atLeast' | 'atMost'
-  limit: number
-  consequence: 'fail' | 'invalid'
-}
+type Consequence = { consequence: 'fail' } | { consequence: 'invalid'; reason: string }
+
+/**
+ * One rule a run is judged by. A run whose value is on the wrong side of the
+ * limit fails the check, with the consequence the rule names.
+ */
+export type Threshold = Reading &
+  Consequence & {
+    bound: 'atLeast' | 'atMost'
+    limit: number
+  }
 
 /** What a run must meet to pass, at 100 phones as at 300. */
 export const THRESHOLDS: readonly Threshold[] = [
@@ -31,12 +36,19 @@ export const THRESHOLDS: readonly Threshold[] = [
   { figure: 'arrivalLeadMs', statistic: 'p1', bound: 'atLeast', limit: 500, consequence: 'fail' },
   // Every phone receives every chunk of the track.
   { figure: 'missingChunks', bound: 'atMost', limit: 0, consequence: 'fail' },
-  // No phone loses its connection while the track plays. Drops before the track, while the
+  // No phone loses its connection from the start of the track until it is stopped. Drops before the track, while the
   // phones join and settle, are reported on their own and have no threshold.
-  { figure: 'drops', bound: 'atMost', limit: 0, consequence: 'fail' },
+  { figure: 'dropsDuringTrack', bound: 'atMost', limit: 0, consequence: 'fail' },
   // 99% of the sampled clock offsets are within 10 ms of the median of all phones.
   { figure: 'offsetFromMedianMs', statistic: 'p99', bound: 'atMost', limit: 10, consequence: 'fail' },
   // The load generator's own event loop fell behind by at most 20 ms at the 99th percentile;
   // beyond that the generator, not the server, was too slow, and the run says nothing about the server.
-  { figure: 'generatorDelayMs', statistic: 'p99', bound: 'atMost', limit: 20, consequence: 'invalid' }
+  {
+    figure: 'generatorDelayMs',
+    statistic: 'p99',
+    bound: 'atMost',
+    limit: 20,
+    consequence: 'invalid',
+    reason: 'the load generator fell behind, so this run says nothing about the server.'
+  }
 ]

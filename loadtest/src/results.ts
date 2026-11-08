@@ -15,8 +15,8 @@ export interface RunResult {
   missingChunks: number
   /** Connections the phones opened, from joining to the end of the track. */
   connects: number
-  /** Live connections the phones lost while the track played. */
-  drops: number
+  /** Live connections the phones lost from the start of the track until it was stopped, including the tail in which late chunks may still arrive. */
+  dropsDuringTrack: number
   /** Live connections the phones lost before the track started, while joining and settling. */
   dropsBeforeTrack: number
   /** Round trip of every clock measurement, from joining to the end of the track, in ms. */
@@ -39,7 +39,7 @@ const DELAY_RESOLUTION_MS = 10
  */
 export const watch = (audience: Audience) => {
   const roundTripsAtStart = audience.phones.map((phone) => phone.roundTripsMs.length)
-  // A phone that joins later has no entry and counts all its drops, since its whole life falls inside the track.
+  // runFixed has every phone joined before it starts watching, so each phone has an entry here.
   const dropsAtStart = audience.phones.map((phone) => phone.drops)
   const distances: number[] = []
   const sampler = setInterval(
@@ -80,7 +80,7 @@ export const watch = (audience: Audience) => {
         arrivalsWithoutClock: arrivals.filter((arrival) => arrival.leadMs === null).length,
         missingChunks,
         connects: phones.reduce((sum, phone) => sum + phone.connects, 0),
-        drops: phones.reduce((sum, phone, index) => sum + phone.drops - (dropsAtStart[index] ?? 0), 0),
+        dropsDuringTrack: phones.reduce((sum, phone, index) => sum + phone.drops - (dropsAtStart[index] ?? 0), 0),
         dropsBeforeTrack: dropsAtStart.reduce((sum, drops) => sum + drops, 0),
         roundTripMs: summarize(phones.flatMap((phone) => phone.roundTripsMs)),
         roundTripsAtStart: summarize(roundTripsAtStart),

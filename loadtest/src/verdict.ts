@@ -5,6 +5,14 @@ export interface Verdict {
   outcome: 'pass' | 'fail' | 'invalid'
   /** One check per threshold, in the order of the thresholds. `value` is null when the run measured nothing for it. */
   checks: { threshold: Threshold; value: number | null; passed: boolean }[]
+  /** The reason of every failed check whose consequence is `invalid`, in the order of the thresholds; empty unless the run is invalid. */
+  invalidBecause: string[]
+}
+
+/** Whether a value meets its limit, per bound. A value equal to its limit meets it. */
+const MEETS: Record<Threshold['bound'], (value: number, limit: number) => boolean> = {
+  atLeast: (value, limit) => value >= limit,
+  atMost: (value, limit) => value <= limit
 }
 
 const read = (result: RunResult, threshold: Threshold): number | null => {
@@ -25,14 +33,11 @@ const read = (result: RunResult, threshold: Threshold): number | null => {
 export const judge = (result: RunResult, thresholds: readonly Threshold[] = THRESHOLDS): Verdict => {
   const checks = thresholds.map((threshold) => {
     const value = read(result, threshold)
-    const passed = value !== null && (threshold.bound === 'atLeast' ? value >= threshold.limit : value <= threshold.limit)
+    const passed = value !== null && MEETS[threshold.bound](value, threshold.limit)
     return { threshold, value, passed }
   })
   const failing = checks.filter((check) => !check.passed)
-  const outcome = failing.some((check) => check.threshold.consequence === 'invalid')
-    ? 'invalid'
-    : failing.length
-      ? 'fail'
-      : 'pass'
-  return { outcome, checks }
+  const invalidBecause = failing.flatMap(({ threshold }) => (threshold.consequence === 'invalid' ? [threshold.reason] : []))
+  const outcome = invalidBecause.length ? 'invalid' : failing.length ? 'fail' : 'pass'
+  return { outcome, checks, invalidBecause }
 }

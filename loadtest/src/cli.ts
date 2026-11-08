@@ -35,7 +35,7 @@ const FIGURES: Record<keyof RunResult, { label: string; unit: (value: number | n
   missingChunks: { label: 'Missing chunks', unit: count },
   arrivalsWithoutClock: { label: 'Chunks before a clock', unit: count },
   connects: { label: 'Connects', unit: count },
-  drops: { label: 'Drops during the track', unit: count },
+  dropsDuringTrack: { label: 'Drops during the track', unit: count },
   dropsBeforeTrack: { label: 'Drops before the track', unit: count },
   generatorDelayMs: { label: 'Generator event loop', unit: ms }
 }
@@ -58,10 +58,10 @@ const checkLine = ({ threshold, value, passed }: Verdict['checks'][number]) => {
 
 /** 1 is left to a crash, which is what Node exits with on an uncaught error, and 2 to a usage error. */
 const EXIT_CODES: Record<Verdict['outcome'], number> = { pass: 0, fail: 3, invalid: 4 }
-const OUTCOMES: Record<Verdict['outcome'], string> = {
-  pass: 'PASS',
-  fail: 'FAIL: the server missed a threshold.',
-  invalid: 'INVALID: the load generator fell behind, so this run says nothing about the server.'
+const OUTCOMES: Record<Verdict['outcome'], (verdict: Verdict) => string> = {
+  pass: () => 'PASS',
+  fail: () => 'FAIL: the server missed a threshold.',
+  invalid: (verdict) => `INVALID: ${verdict.invalidBecause.join(' ')}`
 }
 
 let result
@@ -83,13 +83,13 @@ console.log(
     countLine('missingChunks', result.missingChunks),
     countLine('arrivalsWithoutClock', result.arrivalsWithoutClock),
     countLine('connects', result.connects),
-    countLine('drops', result.drops),
+    countLine('dropsDuringTrack', result.dropsDuringTrack),
     countLine('dropsBeforeTrack', result.dropsBeforeTrack),
     `${FIGURES.generatorDelayMs.label.padEnd(LABEL_WIDTH)} p99 ${ms(result.generatorDelayMs.p99)}, max ${ms(result.generatorDelayMs.max)}`,
     '',
     ...verdict.checks.map(checkLine),
     '',
-    OUTCOMES[verdict.outcome]
+    OUTCOMES[verdict.outcome](verdict)
   ].join('\n')
 )
 process.exitCode = EXIT_CODES[verdict.outcome]

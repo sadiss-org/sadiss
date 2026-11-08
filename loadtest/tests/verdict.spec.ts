@@ -15,7 +15,7 @@ const healthy = (): RunResult => ({
   arrivalsWithoutClock: 0,
   missingChunks: 0,
   connects: 10,
-  drops: 0,
+  dropsDuringTrack: 0,
   dropsBeforeTrack: 0,
   roundTripMs: { count: 200, min: 1, median: 2, p1: 1, p95: 3, p99: 4, max: 5 },
   roundTripsAtStart: { count: 10, min: 20, median: 20, p1: 20, p95: 20, p99: 20, max: 20 },
@@ -27,7 +27,7 @@ const healthy = (): RunResult => ({
 const outside: [string, keyof RunResult, (result: RunResult) => void][] = [
   ['arrival lead p1', 'arrivalLeadMs', (result) => (result.arrivalLeadMs.p1 = 499)],
   ['missing chunks', 'missingChunks', (result) => (result.missingChunks = 1)],
-  ['drops', 'drops', (result) => (result.drops = 1)],
+  ['drops during the track', 'dropsDuringTrack', (result) => (result.dropsDuringTrack = 1)],
   ['offset from the median p99', 'offsetFromMedianMs', (result) => (result.offsetFromMedianMs.p99 = 10.5)]
 ]
 
@@ -39,6 +39,7 @@ describe('the verdict on a run', () => {
     expect(verdict.outcome).toBe('pass')
     expect(verdict.checks).toHaveLength(THRESHOLDS.length)
     expect(failed(verdict)).toEqual([])
+    expect(verdict.invalidBecause).toEqual([])
   })
 
   it.each(outside)('fails a run outside the %s threshold and names it with its value and limit', (_, figure, spoil) => {
@@ -97,7 +98,7 @@ describe('the verdict on a run', () => {
   it('calls a run invalid rather than failed when the generator fell behind and a check also failed', () => {
     const result = healthy()
     result.generatorDelayMs.p99 = 35
-    result.drops = 3
+    result.dropsDuringTrack = 3
     const verdict = judge(result)
     expect(verdict.outcome).toBe('invalid')
     expect(failed(verdict)).toHaveLength(2)
@@ -108,7 +109,7 @@ describe('the verdict on a run', () => {
       { figure: 'arrivalLeadMs', statistic: 'p1', bound: 'atLeast', limit: 970, consequence: 'fail' },
       { figure: 'connects', bound: 'atMost', limit: 10, consequence: 'fail' },
       { figure: 'roundTripMs', statistic: 'median', bound: 'atMost', limit: 2, consequence: 'fail' },
-      { figure: 'generatorDelayMs', statistic: 'max', bound: 'atMost', limit: 3, consequence: 'invalid' }
+      { figure: 'generatorDelayMs', statistic: 'max', bound: 'atMost', limit: 3, consequence: 'invalid', reason: 'the generator stalled.' }
     ]
     const verdict = judge(healthy(), strict)
     expect(verdict.outcome).toBe('invalid')
@@ -118,5 +119,16 @@ describe('the verdict on a run', () => {
       { threshold: strict[2], value: 2, passed: true },
       { threshold: strict[3], value: 4, passed: false }
     ])
+  })
+
+  it('says why a run is invalid by the reason of each failed invalid check, and only of those', () => {
+    const thresholds: Threshold[] = [
+      { figure: 'connects', bound: 'atMost', limit: 1, consequence: 'fail' },
+      { figure: 'phones', bound: 'atLeast', limit: 100, consequence: 'invalid', reason: 'too few phones joined.' },
+      { figure: 'generatorDelayMs', statistic: 'p99', bound: 'atMost', limit: 20, consequence: 'invalid', reason: 'the generator fell behind.' }
+    ]
+    const verdict = judge(healthy(), thresholds)
+    expect(verdict.outcome).toBe('invalid')
+    expect(verdict.invalidBecause).toEqual(['too few phones joined.'])
   })
 })
