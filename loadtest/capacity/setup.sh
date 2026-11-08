@@ -50,7 +50,9 @@ setup() {
 
   # The server joins UPLOADS_DIR onto its own folder in places, so the data
   # folders are reached through links there, as on the live instance.
-  mkdir -p "$CAPACITY_DIR/server" "$CAPACITY_DATA/chunks" "$CAPACITY_DATA/uploads"
+  # public is where the server builds track zips for download and unpacks
+  # uploaded ones; it is not in git, so the live instance's was made by hand.
+  mkdir -p "$CAPACITY_DIR/server/public" "$CAPACITY_DATA/chunks" "$CAPACITY_DATA/uploads"
   local dir link
   for dir in uploads chunks; do
     link=$CAPACITY_DIR/server/$dir
