@@ -2,11 +2,19 @@
 
 Virtual phones that connect to a SADISS server the way the app does, play a generated track and report what they received. They connect through the app's own device connection and clock sync (`app/src/composables/deviceConnection.ts` and `clockSync.ts`), so they register, keep time and reconnect exactly as a phone does; they play no sound.
 
+## The room
+
+The phones join the way a room fills up. Most join one after another over `--join-over` seconds before the track and measure their clocks for `--settle` seconds; the rest, a share set by `--late-share`, join one after another over the first half of the track. A phone that joins during the track is expected to receive every chunk from the one after the next chunk the server sends once its connection went live: that next one may race the phone's registration.
+
+With `--voices`, the track is in choir mode: each partial is one voice, and a phone plays the partial whose index is its choir id. The admin prints one QR code per voice and people take whichever is in front of them, so choir ids go round over the voices in join order. With `--langs`, every voice has a phrase every `--phrase-every` seconds in each language (in nonChoir mode only voice 0, which the server reads to every phone), and the phones' languages go round once per round of voices, so every voice is heard in every language. Each phrase's text names its voice, language and time, so a phone can tell when it was sent the wrong one. Without `--langs` a phone sends no language, as the app does when its QR code offers none.
+
 ## What a run reports
 
 - **Arrival before sound:** how long before its first sound each chunk reached each phone, by that phone's own estimate of the server clock. The server sends a chunk about one second ahead, so a healthy run reads a little under 1000 ms; a negative value means the chunk came too late to play on time.
-- **Clock offset off the median:** every second while the track plays, how far each phone's clock offset is from the median offset of all phones. All virtual phones of a run share one physical clock, so a perfect clock sync would give them identical offsets, and each distance is that phone's share of the sync's error. This holds only for virtual phones: real phones have clocks of their own, so their offsets differ for that reason alone.
-- **Round trips at track start:** how many clock measurements each phone had completed when the track started. The app's clock estimate uses the last 20, one every 3 s, so it is settled about a minute after a phone joins.
+- **Clock offset off the median:** every second while the track plays, how far the clock offset of each phone that joined before the track is from the median offset of those phones. All virtual phones of a run share one physical clock, so a perfect clock sync would give them identical offsets, and each distance is that phone's share of the sync's error. This holds only for virtual phones: real phones have clocks of their own, so their offsets differ for that reason alone.
+- **Late phones off the median:** the same for each phone that joined during the track, measured against the median of the phones that joined before it. A late phone's clock has had few round trips, and with one round trip its offset can be off by up to half that round trip, so this figure has no threshold.
+- **Phrase before its time,** **missing phrases** (phrases of a phone's voice it never received, counted per phone and, for a late phone, as for its chunks), **wrong phrases** (received with the text of another voice or language, without a text, or at a time its voice has none) and **phrases before a clock:** printed only for a track with phrases.
+- **Round trips at track start:** how many clock measurements each phone that joined before the track had completed when the track started. The app's clock estimate uses the last 20, one every 3 s, so it is settled about a minute after a phone joins.
 - **Measurement round trip** (every clock measurement from joining to the end of the track), **missing chunks** (counted per phone), **chunks before a clock** (received before the phone had any clock estimate), and **connects** (every connection the phones opened, from joining to the end of the track).
 - **Drops during the track** and **drops before the track:** how often a phone lost a live connection from the start of the track until it was stopped (including the few seconds after the last chunk in which late chunks may still arrive), and before it started, while the phones joined and settled.
 - **Generator event loop:** how far the load generator's own event loop fell behind while the track played. When this is high, the generator, not the server, was the bottleneck, and the run is invalid (see below).
@@ -18,8 +26,9 @@ A run that cannot connect any phone stops with an error instead of reporting a c
 After the figures, a run checks each threshold in [`src/thresholds.ts`](src/thresholds.ts) and prints one line per check, with the measured value, the limit and whether it passed. A value equal to its limit passes. Then it prints the outcome: PASS, FAIL or INVALID.
 
 - **Arrival before sound p1:** the 1st percentile of how long before its sound each chunk arrived. When it is at least the limit, 99% of chunks arrived at least that long before they had to sound. Chunks that reached a phone before it had a clock are not in this figure; they are printed as a count and have no threshold.
-- **Missing chunks** and **drops during the track:** every phone receives every chunk, and no phone loses its connection from the start of the track until it is stopped. Drops before the track are printed as a count and have no threshold.
-- **Clock offset off the median p99:** 99% of the sampled offsets are that close to the median of all phones.
+- **Missing chunks** and **drops during the track:** every phone receives every chunk (a late phone from the chunk the room section above names), and no phone loses its connection from the start of the track until it is stopped. Drops before the track are printed as a count and have no threshold.
+- **Clock offset off the median p99:** 99% of the sampled offsets of the phones that joined before the track are that close to their median.
+- For a track with phrases, phrases are held to the same rules as chunks: **phrase before its time p1** at least the same limit, and no **missing phrases** or **wrong phrases**.
 - **Generator event loop p99:** the load generator kept up. When its own event loop fell behind by more than the limit, the generator could not have read or answered the server on time, so a late chunk or a slow clock answer might be its own fault. The run is then INVALID, whatever the other checks say, and should be repeated with a faster laptop or fewer phones. The checks are still printed.
 
 A check whose figure has no value, such as no chunk arriving at a phone that had a clock, fails and prints `-`.
@@ -55,7 +64,13 @@ npm install
 SADISS_ADMIN_EMAIL=loadtest@example.invalid SADISS_ADMIN_PASSWORD=<the same> npm run loadtest -- --phones 10 --seconds 30
 ```
 
-Options, with their defaults: `--api http://127.0.0.1:3000`, `--ws ws://127.0.0.1:8080`, `--phones 10`, `--seconds 30` (track length), `--partials 16` (partials per frame; in nonChoir mode the server shares them out over the phones, at most 16 each), `--join-over 5` (seconds over which the phones join) and `--settle 60` (seconds the phones measure their clocks before the track starts). A value that is not a number is refused, and so is `--phones` below 2, since the offset from the median needs at least two phones (`MIN_PHONES` in [`src/stats.ts`](src/stats.ts)).
+Options, with their defaults: `--api http://127.0.0.1:3000`, `--ws ws://127.0.0.1:8080`, `--phones 10`, `--seconds 30` (track length), `--partials 16` (partials per frame; in nonChoir mode the server shares them out over the phones, at most 16 each), `--voices` (choir mode with this many voices, one partial each; not together with `--partials`), `--langs` (phrases in these ISO codes, separated by commas, such as `en-US,de-DE`), `--phrase-every 4` (seconds between a voice's phrases, at least 1, since the server keeps one phrase per voice and chunk), `--join-over 5` (seconds over which the phones that join before the track do so), `--late-share 0.1` (the share of phones that join during the first half of the track) and `--settle 60` (seconds the phones measure their clocks before the track starts). A value that is not a number is refused, and so is `--phones` below 2, or a late share that leaves fewer than 2 phones joining before the track, since the offset from the median needs at least two phones (`MIN_PHONES` in [`src/stats.ts`](src/stats.ts)).
+
+A choir run with phrases:
+
+```sh
+npm run loadtest -- --phones 20 --voices 4 --langs en-US,de-DE --phrase-every 3 --late-share 0.2
+```
 
 Each run uploads its own track into a new performance, named `loadtest` with the time of the run.
 

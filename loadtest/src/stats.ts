@@ -41,10 +41,15 @@ export const MIN_PHONES = 2
  * that phone's share of the sync's error. Unlike the highest minus the lowest
  * offset, these distances do not grow just because there are more phones.
  * Phones without an estimate yet are left out.
+ *
+ * `others` are measured against the same median without moving it, such as
+ * phones whose clocks have not settled yet; their distances come back apart.
  */
-export const distancesFromMedian = (offsets: (number | null)[]) => {
-  const known = offsets.filter((offset): offset is number => offset !== null)
-  if (known.length < MIN_PHONES) return []
+export const distancesFromMedian = (offsets: (number | null)[], others: (number | null)[] = []) => {
+  const isKnown = (offset: number | null): offset is number => offset !== null
+  const known = offsets.filter(isKnown)
+  if (known.length < MIN_PHONES) return { distances: [], others: [] }
   const median = summarize(known).median ?? 0
-  return known.map((offset) => Math.abs(offset - median))
+  const from = (values: number[]) => values.map((offset) => Math.abs(offset - median))
+  return { distances: from(known), others: from(others.filter(isKnown)) }
 }

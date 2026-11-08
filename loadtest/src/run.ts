@@ -3,6 +3,7 @@ import { CHUNK_SECONDS } from '@server/types/ChunkEnvelope'
 import { createAudience, joinGradually } from './audience'
 import { Options } from './options'
 import { RunResult, watch } from './results'
+import { planRoom } from './room'
 import { createTarget, PreparedPerformance } from './target'
 
 /** How long after the last chunk is due it may still be on its way. */
@@ -22,8 +23,9 @@ export const stopTrack = async (performance: Pick<PreparedPerformance, 'stop'>, 
 }
 
 /**
- * One run with a fixed number of phones: the phones join, measure their clocks,
- * hear the whole track and leave.
+ * One run with a fixed number of phones: most phones join and measure their
+ * clocks before the track, the rest join during its first half, and all of
+ * them hear the track to its end and leave.
  */
 export const runFixed = async (
   options: Options,
@@ -36,12 +38,12 @@ export const runFixed = async (
   const audience = createAudience()
   let watching: ReturnType<typeof watch> | undefined
   try {
-    await joinGradually(audience, options.phones, options.joinOverMs, () => ({
+    const seats = planRoom({ phones: options.phones, track: options.track, lateShare: options.lateShare }).map((seat) => ({
       wsUrl: options.wsUrl,
       performanceId: performance.id,
-      choirId: 0,
-      ttsLang: { iso: 'en-US', lang: 'English' }
+      seat
     }))
+    await joinGradually(audience, seats.filter(({ seat }) => !seat.late), options.joinOverMs)
     await sleep(options.settleMs)
     if (audience.phones.every((phone) => phone.connects === 0)) {
       throw new Error(`No phone could connect to ${options.wsUrl}.`)
@@ -49,7 +51,10 @@ export const runFixed = async (
 
     watching = watch(audience)
     await performance.start()
-    await sleep(performance.chunkCount * CHUNK_SECONDS * 1000 + TAIL_MS)
+    const trackMs = performance.chunkCount * CHUNK_SECONDS * 1000
+    const lateJoining = joinGradually(audience, seats.filter(({ seat }) => seat.late), trackMs / 2)
+    await sleep(trackMs + TAIL_MS)
+    await lateJoining
     await stopTrack(performance, warn)
     const result = watching.finish(options.track, performance.chunkCount)
     watching = undefined

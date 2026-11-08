@@ -1,4 +1,4 @@
-import { partialFile, TrackShape } from './track'
+import { partialFile, TrackShape, ttsFiles } from './track'
 
 /** A generated track in its own performance on the server under test, ready to play. */
 export interface PreparedPerformance {
@@ -59,11 +59,12 @@ export const createTarget = async (apiUrl: string, email: string, password: stri
     async prepare(shape, label) {
       const form = new FormData()
       form.append('name', label)
-      form.append('mode', 'nonChoir')
+      form.append('mode', shape.choir ? 'choir' : 'nonChoir')
       form.append('waveform', 'sine')
       form.append('ttsRate', '1')
       form.append('isPublic', 'false')
       form.append('files', new Blob([partialFile(shape)], { type: 'text/plain' }), 'partialfile_loadtest.txt')
+      for (const { name, content } of ttsFiles(shape)) form.append('files', new Blob([content], { type: 'text/plain' }), name)
       const track = await call('/api/track/create', { method: 'POST', body: form })
       const trackId = stringField(track, '_id', 'track')
       const chunkCount = numberField(track, 'trackLengthInChunks', 'track')

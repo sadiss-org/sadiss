@@ -1,5 +1,5 @@
 import { RunResult } from './results'
-import { Threshold, THRESHOLDS } from './thresholds'
+import { Threshold, thresholdsFor } from './thresholds'
 
 export interface Verdict {
   outcome: 'pass' | 'fail' | 'invalid'
@@ -24,13 +24,13 @@ const read = (result: RunResult, threshold: Threshold): number | null => {
 }
 
 /**
- * Judges a run by its thresholds. A value equal to its limit passes; a value the
+ * Judges a run by its thresholds, by default those of its track. A value equal to its limit passes; a value the
  * run did not measure fails, since the run did not show that the threshold
  * holds. A run is invalid when any check whose consequence is `invalid`
  * failed, whatever the other checks say; otherwise it fails when any check
  * failed.
  */
-export const judge = (result: RunResult, thresholds: readonly Threshold[] = THRESHOLDS): Verdict => {
+export const judge = (result: RunResult, thresholds: readonly Threshold[] = thresholdsFor(result.track)): Verdict => {
   const checks = thresholds.map((threshold) => {
     const value = read(result, threshold)
     const passed = value !== null && MEETS[threshold.bound](value, threshold.limit)
