@@ -12,7 +12,7 @@
  */
 
 import { Writable } from 'stream'
-import { logger } from '../tools'
+import { logger, reasonOf } from '../tools'
 
 /** How long a log whose stream could not be opened or failed waits before it opens another. */
 const RETRY_MS = 60 * 1000
@@ -36,20 +36,20 @@ interface Target {
   done: boolean
 }
 
-const reasonOf = (err: unknown) => (err instanceof Error ? err.message : String(err))
-
 /**
  * A log named `name` in console messages, writing to the streams `open` gives
  * it. `open` is called for the first record, and again after a stream could not
- * be opened or failed; `afterFailure` says it is the second case, so whatever
- * the stream needs, such as its directory, may have to be made again. It may
- * throw, which counts as a failure. `now` is the clock the records are stamped
- * with, in milliseconds.
+ * be opened or failed; it may throw, which counts as a failure. Before that next
+ * try, once the minute is over, `prepareRetry` makes again whatever the stream
+ * needs, such as its directory. It works in the background, and records written
+ * until it settles are counted as lost. `now` is the clock the records are
+ * stamped with, in milliseconds.
  */
 export const createRecordLog = <R extends { type: string }>(
   name: string,
-  open: (afterFailure: boolean) => Writable,
-  now: () => number
+  open: () => Writable,
+  now: () => number,
+  prepareRetry: () => Promise<void> = () => Promise.resolve()
 ): RecordLog<R> & {
   /** Ends the stream, after writing how many lines were lost. Records written afterwards are ignored. */
   close(): void
@@ -61,21 +61,24 @@ export const createRecordLog = <R extends { type: string }>(
 } => {
   let current: Target | undefined
   let closed = false
-  let failedBefore = false
   let lost = 0
-  /** The wait before another stream may be opened, while one is due. */
-  let retry: NodeJS.Timeout | undefined
+  /** Whether a failure is being waited out, after which another stream may be opened. */
+  let retrying = false
+  let retryTimer: NodeJS.Timeout | undefined
 
   const fail = (reason: string) => {
     logger.error(`Log ${name} ${reason}, trying again in a minute`)
-    failedBefore = true
-    retry = setTimeout(() => {
-      retry = undefined
-      // Opened at once only to say how many lines were lost. Otherwise the next record opens it.
-      if (lost && !closed) openStream()
+    retrying = true
+    retryTimer = setTimeout(() => {
+      retryTimer = undefined
+      void prepareRetry().then(() => {
+        retrying = false
+        // Opened at once only to say how many lines were lost. Otherwise the next record opens it.
+        if (lost && !closed) openStream()
+      })
     }, RETRY_MS)
     // Don't let a log alone keep the process alive.
-    retry.unref()
+    retryTimer.unref()
   }
 
   const append = (target: Target, record: R | DroppedRecord, lines: number) => {
@@ -84,7 +87,6 @@ export const createRecordLog = <R extends { type: string }>(
       if (target.done) return
       target.unconfirmed -= lines
       if (err) lost += lines
-      else failedBefore = false
     })
     if (!more) target.backedUp = true
   }
@@ -100,7 +102,7 @@ export const createRecordLog = <R extends { type: string }>(
   const openStream = () => {
     let stream: Writable
     try {
-      stream = open(failedBefore)
+      stream = open()
     } catch (err) {
       fail(`cannot be opened (${reasonOf(err)})`)
       return
@@ -128,7 +130,7 @@ export const createRecordLog = <R extends { type: string }>(
   return {
     write: (record) => {
       if (closed) return
-      if (!current && !retry) openStream()
+      if (!current && !retrying) openStream()
       if (!current || current.backedUp) {
         lost++
         return
@@ -139,8 +141,8 @@ export const createRecordLog = <R extends { type: string }>(
     close: () => {
       if (closed) return
       closed = true
-      clearTimeout(retry)
-      retry = undefined
+      clearTimeout(retryTimer)
+      retryTimer = undefined
       if (!current) return
 
       const target = current

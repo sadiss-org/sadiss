@@ -1,7 +1,7 @@
 import WebSocket from 'ws'
 import { progressOf, runningSessionCount } from './playbackService'
 import { PlaybackProgress } from '../playbackSession'
-import { logger } from '../tools'
+import { logger, reasonOf } from '../tools'
 import { ClientInfoMessage, CURRENT_PROTOCOL_VERSION, readProtocolVersion } from '../types'
 import { measurementService } from './measurement'
 import { performanceLogFiles } from './performanceLogFiles'
@@ -182,7 +182,7 @@ const performanceExists = async (performanceId: string, visibleToUserId?: string
     return !!(await SadissPerformance.exists({ _id: performanceId, ...(visibleToUserId ? visibleTo(visibleToUserId) : {}) }))
   } catch (err) {
     const whose = visibleToUserId ? ` is visible to ${visibleToUserId}` : ' exists'
-    logger.error(`Failed checking whether performance ${performanceId}${whose}: ${err instanceof Error ? err.message : err}`)
+    logger.error(`Failed checking whether performance ${performanceId}${whose}: ${reasonOf(err)}`)
     return false
   }
 }

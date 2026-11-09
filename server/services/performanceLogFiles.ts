@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { PerformanceLog, PerformanceRecord, ServerLog, ServerRecord } from '../lib/performanceLog'
 import { createRecordLog } from '../lib/recordLog'
-import { logger } from '../tools'
+import { logger, reasonOf } from '../tools'
 
 /**
  * The application-wide log files, in the directory `PERFORMANCE_LOG_DIR` names:
@@ -19,7 +19,8 @@ import { logger } from '../tools'
  *
  * Each file is a record log (lib/recordLog.ts), which tries a file that could
  * not be written again a minute later and counts what it lost meanwhile. Here
- * the directory is made again for that next try, in case it was removed.
+ * the directory is made again before that next try, in case it was removed,
+ * without waiting on the disk: a record can be written from the playback step.
  */
 
 const IDLE_MS = 10 * 60 * 1000
@@ -33,8 +34,6 @@ interface LogFile {
   log: ReturnType<typeof createRecordLog<AnyRecord>>
   lastWrittenAt: number
 }
-
-const reasonOf = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
 const createPerformanceLogFiles = (initialDir: string | null) => {
   let dir: string | null = null
@@ -57,11 +56,15 @@ const createPerformanceLogFiles = (initialDir: string | null) => {
     }
   }
 
-  /** Opens a file for appending. Once it failed, the directory is made again first. */
-  const opener = (fileDir: string, name: string) => (afterFailure: boolean) => {
-    if (afterFailure) fs.mkdirSync(fileDir, { recursive: true })
-    return fs.createWriteStream(path.join(fileDir, name), { flags: 'a' })
-  }
+  /** Opens a file for appending. */
+  const opener = (fileDir: string, name: string) => () => fs.createWriteStream(path.join(fileDir, name), { flags: 'a' })
+
+  /** Makes the directory again before a file that failed is tried again. If it cannot, opening the file says why. */
+  const remakeDir = (fileDir: string) => () =>
+    fs.promises.mkdir(fileDir, { recursive: true }).then(
+      () => undefined,
+      () => undefined
+    )
 
   const closeFile = (name: string) => {
     files.get(name)?.log.close()
@@ -84,7 +87,7 @@ const createPerformanceLogFiles = (initialDir: string | null) => {
 
     let file = files.get(name)
     if (!file) {
-      file = { log: createRecordLog<AnyRecord>(name, opener(dir, name), Date.now), lastWrittenAt: 0 }
+      file = { log: createRecordLog<AnyRecord>(name, opener(dir, name), Date.now, remakeDir(dir)), lastWrittenAt: 0 }
       files.set(name, file)
     }
     file.lastWrittenAt = Date.now()

@@ -394,6 +394,8 @@ describe('the performance log file', () => {
     log.write({ type: 'ended', trackId: 'missed' })
 
     vi.advanceTimersByTime(31 * 1000)
+    // The directory is made again in the background before the file is reopened.
+    await waitFor('the reopened file', () => (fs.existsSync(file) && fs.readFileSync(file, 'utf8')) || undefined)
     log.write({ type: 'ended', trackId: 'after' })
 
     // The record that went into the stream before it failed is counted too.
@@ -433,6 +435,21 @@ describe('the performance log file', () => {
     ])
   })
 
+  it('makes the directory again without waiting on the disk, so a record written during a retry never blocks', async () => {
+    fs.rmSync(dir, { recursive: true })
+    const performanceId = new Types.ObjectId().toString()
+    const log = performanceLogFiles.for(performanceId)
+    const mkdirSync = vi.spyOn(fs, 'mkdirSync')
+
+    log.write({ type: 'ended', trackId: 'missed' })
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    vi.advanceTimersByTime(61 * 1000)
+    log.write({ type: 'ended', trackId: 'after' })
+
+    expect(mkdirSync).not.toHaveBeenCalled()
+    mkdirSync.mockRestore()
+  })
+
   it('creates the directory again when it was removed, and says how many records it missed', async () => {
     fs.rmSync(dir, { recursive: true })
     const performanceId = new Types.ObjectId().toString()
@@ -441,6 +458,8 @@ describe('the performance log file', () => {
     log.write({ type: 'ended', trackId: 'missed' })
     await new Promise((resolve) => setTimeout(resolve, 100))
     vi.advanceTimersByTime(61 * 1000)
+    // The directory is made again in the background before the file is reopened.
+    await waitForRecords(performanceId, 1)
     log.write({ type: 'ended', trackId: 'after' })
 
     expect((await waitForRecords(performanceId, 2)).map(({ t, ...record }) => record)).toEqual([

@@ -2,11 +2,10 @@
  * What the log files record: a performance's file of what happened during it,
  * one JSON object per line, for working out afterwards what went wrong on which
  * phone, and the server-wide file of connections that belong to no performance
- * yet. Both are written as record logs (lib/recordLog.ts), which also write a
- * `dropped` record wherever lines were lost.
+ * yet. Both are written as record logs (lib/recordLog.ts).
  */
 
-import { RecordLog } from './recordLog'
+import { DroppedRecord, RecordLog } from './recordLog'
 
 /** Something a performance's log records, told apart by `type`. */
 export type PerformanceRecord =
@@ -33,6 +32,8 @@ export type PerformanceRecord =
   | { type: 'loop'; trackId: string }
   /** A track that does not loop ran out. */
   | { type: 'ended'; trackId: string }
+  /** Lines before this one were lost because they could not be written; written by the log itself. */
+  | DroppedRecord
 
 /**
  * Something the server-wide log records: what happens to a connection while its
@@ -54,6 +55,8 @@ export type ServerRecord =
    * exist, is still being looked up, or that it switched away from.
    */
   | Disconnect
+  /** Lines before this one were lost because they could not be written; written by the log itself. */
+  | DroppedRecord
 
 /** Why a socket closed: `heartbeat` when the server gave up on a peer that went quiet, `closed` for everything else. */
 export type CloseReason = 'closed' | 'heartbeat'
