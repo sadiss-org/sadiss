@@ -65,11 +65,13 @@ const readAdminRegistration = (frame: Frame): AdminRegistrationMessage | undefin
     ? { message: 'isAdmin', performanceId: frame.performanceId as string | undefined }
     : undefined
 
-const readers: { [type: string]: (frame: Frame) => InboundMessage | undefined } = {
-  clientInfo: readClientInfo,
-  measure: readMeasure,
-  isAdmin: readAdminRegistration
-}
+// A Map, so a type sent by a client finds only these readers, never a property
+// every object inherits, such as __proto__ or valueOf.
+const readers = new Map<string, (frame: Frame) => InboundMessage | undefined>([
+  ['clientInfo', readClientInfo],
+  ['measure', readMeasure],
+  ['isAdmin', readAdminRegistration]
+])
 
 /** One of our messages, or nothing at all. Nothing is returned rather than thrown. */
 export const readInboundMessage = (raw: string): InboundMessage | undefined => {
@@ -87,7 +89,7 @@ export const readInboundMessage = (raw: string): InboundMessage | undefined => {
     return undefined
   }
 
-  const read = readers[parsed.message as string]
+  const read = readers.get(parsed.message as string)
   if (!read) {
     logger.debug(`Ignored a message of an unknown type: ${parsed.message}`)
     return undefined

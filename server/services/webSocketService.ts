@@ -72,27 +72,36 @@ const setupClientEventHandlers = (wss: SadissWebSocketServer, client: SadissWebS
   client.onmessage = handleMessage(wss, client)
 }
 
+/**
+ * Handles one frame from a client. Anyone can open a socket, and nothing above
+ * this catches what it throws, so a failure here would end the process and drop
+ * every phone. It costs the one frame instead, and is logged.
+ */
 const handleMessage = (wss: SadissWebSocketServer, client: SadissWebSocket) => (event: WebSocket.MessageEvent) => {
   client.lastSeenAt = Date.now()
 
-  const parsed = readInboundMessage(event.data.toString())
-  if (!parsed) {
-    return
-  }
+  try {
+    const parsed = readInboundMessage(event.data.toString())
+    if (!parsed) {
+      return
+    }
 
-  logger.debug(`Received message from ws client: ${parsed.message}`)
+    logger.debug(`Received message from ws client: ${parsed.message}`)
 
-  switch (parsed.message) {
-    case 'clientInfo':
-      registerDevice(client, parsed)
-      break
-    case 'measure':
-      client.reportsRegularly = true
-      measurementService.handleMeasure(client, parsed)
-      break
-    case 'isAdmin':
-      void registerAdmin(wss, client, parsed)
-      break
+    switch (parsed.message) {
+      case 'clientInfo':
+        registerDevice(client, parsed)
+        break
+      case 'measure':
+        client.reportsRegularly = true
+        measurementService.handleMeasure(client, parsed)
+        break
+      case 'isAdmin':
+        void registerAdmin(wss, client, parsed)
+        break
+    }
+  } catch (err) {
+    logger.error(`Dropped a message from ${client.id} whose handling failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
