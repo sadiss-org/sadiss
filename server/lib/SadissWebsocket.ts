@@ -20,6 +20,13 @@ export class SadissWebSocket extends WebSocket {
    * is told apart from one that belongs to another.
    */
   performanceId = ''
+  /** When the socket opened, in milliseconds on the server's clock. */
+  readonly openedAt = Date.now()
+  /**
+   * Why the socket closed, as the performance log records it: `heartbeat` when
+   * the server gave up on a peer that went quiet, `closed` for everything else.
+   */
+  closeReason: 'closed' | 'heartbeat' = 'closed'
   /** When this peer was last heard from. See lib/heartbeat.ts. */
   lastSeenAt = Date.now()
   /**

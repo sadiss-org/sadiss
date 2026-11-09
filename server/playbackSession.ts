@@ -5,6 +5,7 @@ import { Recipient } from './lib/audience'
 import { PartialMap } from './partialDistribution'
 import { payloadsForChunk } from './chunkPayloads'
 import { CHUNK_SECONDS } from './types/ChunkEnvelope'
+import { noPerformanceLog, PerformanceLog } from './lib/performanceLog'
 
 const CHUNK_INTERVAL_MS = CHUNK_SECONDS * 1000
 
@@ -48,6 +49,8 @@ export class PlaybackSession {
    * the time since the start does not say which chunk went out last.
    */
   private sentChunk = 0
+  /** Where this run records what it did, handed over when it starts. */
+  private log: PerformanceLog = noPerformanceLog
   readonly performanceKey: string
 
   constructor(
@@ -63,7 +66,12 @@ export class PlaybackSession {
 
   isRunning = () => this.running
 
-  stop = () => (this.running = false)
+  /** Stops a run an admin no longer wants. The devices are told on the next tick. */
+  stop = () => {
+    if (!this.running) return
+    this.running = false
+    this.log.write({ type: 'stop', trackId: this.trackId })
+  }
 
   /** Where this run has got to, which is what an admin is shown. */
   progress = (): PlaybackProgress =>
@@ -84,12 +92,17 @@ export class PlaybackSession {
    * `audienceNow` is read once per chunk, so a device that connects or leaves
    * mid-track is picked up on the next one.
    *
+   * `log` is where the run records its start and how it ended, each after the
+   * devices have been told.
+   *
    * More or less accurate timer taken from https://stackoverflow.com/a/29972322/16725862
    */
-  start = (startTime: number, audienceNow: () => Recipient[]) => {
+  start = (startTime: number, audienceNow: () => Recipient[], log: PerformanceLog) => {
     if (this.running) {
       return false
     }
+
+    this.log = log
 
     /** Sends the same message to every device playing the performance. */
     const announce = (message: { start: true } | { stop: true }) => {
@@ -115,6 +128,9 @@ export class PlaybackSession {
     // nonChoir mode: which device held which partial last chunk, so a partial
     // stays with the same device for as long as that device is connected.
     let partialMap: PartialMap = {}
+
+    /** Whether the track began again since the last chunk went out, to be recorded once it has. */
+    let looped = false
 
     /**
      * Sends the current chunk. It runs from a timer, where nothing above catches
@@ -171,6 +187,11 @@ export class PlaybackSession {
         logger.info('No clients to distribute to.')
       }
 
+      if (looped) {
+        looped = false
+        log.write({ type: 'loop', trackId: this.trackId })
+      }
+
       this.sentChunk = chunkIndex
       chunkIndex++
 
@@ -190,6 +211,7 @@ export class PlaybackSession {
       const rounds = Math.floor(chunkIndex / length)
       actualStartTime += rounds * length
       chunkIndex -= rounds * length
+      looped = true
     }
 
     /**
@@ -210,6 +232,7 @@ export class PlaybackSession {
 
     // Start
     setTimeout(step, CHUNK_INTERVAL_MS)
+    log.write({ type: 'start', trackId: this.trackId, loop: this.loop, startAtChunk: this.startAtChunk })
 
     const reset = () => {
       partialMap = {}
@@ -229,6 +252,7 @@ export class PlaybackSession {
           logger.info('No more chunks. Stopping.')
           this.running = false
           reset()
+          log.write({ type: 'ended', trackId: this.trackId })
           return false
         }
       }

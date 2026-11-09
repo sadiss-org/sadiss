@@ -19,6 +19,7 @@
 import { Types } from 'mongoose'
 import { createMockWsClient } from './testUtils'
 import { PlaybackSession } from '../playbackSession'
+import { noPerformanceLog } from '../lib/performanceLog'
 import { webSocketAudience } from '../lib/audience'
 import { Frame, PartialChunk, TrackMode, TtsInstructions } from '../types'
 
@@ -51,7 +52,7 @@ const audienceFor = (run: Run) => webSocketAudience(testWss(), String(run.perfor
  * which is how we simulate a client (dis)connecting mid-performance.
  */
 const drive = (run: Run, frameCount: number, betweenFrames?: (frameIndex: number) => void) => {
-  run.session!.start(Date.now() / 1000, audienceFor(run))
+  run.session!.start(Date.now() / 1000, audienceFor(run), noPerformanceLog)
   for (let i = 0; i < frameCount; i++) {
     vi.advanceTimersByTime(1000)
     betweenFrames?.(i)
@@ -274,8 +275,8 @@ describe('partial distribution (characterization)', () => {
       createMockWsClient(performanceId, 0)
       loadNonChoir(run, [frame([0]), frame([0]), frame([0])])
 
-      const first = run.session!.start(Date.now() / 1000, audienceFor(run))
-      const second = run.session!.start(Date.now() / 1000, audienceFor(run))
+      const first = run.session!.start(Date.now() / 1000, audienceFor(run), noPerformanceLog)
+      const second = run.session!.start(Date.now() / 1000, audienceFor(run), noPerformanceLog)
 
       expect(first).toBe(true)
       expect(second).toBe(false)

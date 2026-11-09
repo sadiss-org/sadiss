@@ -8,6 +8,7 @@ import { trackRepository } from '../repositories/TrackRepository'
 import { trackPerformanceRepository } from '../repositories/TrackPerformanceRepository'
 import { NotFoundError } from '../errors/NotFoundError'
 import { ProcessingError } from '../errors/ProcessingError'
+import { performanceLogs } from './performanceLogs'
 
 /** The session currently playing for a performance, if any. */
 const sessions = new Map<string, PlaybackSession>()
@@ -76,7 +77,11 @@ export const startSession = (session: PlaybackSession, startTime: number, wss: S
   }
 
   sessions.set(session.performanceKey, session)
-  return session.start(startTime, webSocketAudience(wss, session.performanceKey))
+  return session.start(
+    startTime,
+    webSocketAudience(wss, session.performanceKey),
+    performanceLogs.for(session.performanceKey)
+  )
 }
 
 /** Stops and discards the session for a performance. Returns false if none was playing. */

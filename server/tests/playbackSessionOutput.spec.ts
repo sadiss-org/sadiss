@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PlaybackSession } from '../playbackSession'
+import { noPerformanceLog } from '../lib/performanceLog'
 import { Recipient } from '../lib/audience'
 import { Frame, PartialChunk, TrackSettings } from '../types'
 
@@ -78,7 +79,7 @@ describe('what a playback session sends', () => {
       const audience = audienceOf([one, two])
       const session = new PlaybackSession(PERFORMANCE_ID, 'track', [frame([partial(0)])], 0, false, settings())
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
 
       expect(one.received).toEqual([{ start: true }])
       expect(two.received).toEqual([{ start: true }])
@@ -97,7 +98,7 @@ describe('what a playback session sends', () => {
         settings()
       )
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
       playChunks(1)
 
       expect(soprano.received[1]).toEqual({
@@ -115,7 +116,7 @@ describe('what a playback session sends', () => {
       const audience = audienceOf([singing, silent])
       const session = new PlaybackSession(PERFORMANCE_ID, 'track', [frame([partial(0)])], 0, false, settings())
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
       playChunks(1)
 
       expect(singing.received).toHaveLength(2)
@@ -128,7 +129,7 @@ describe('what a playback session sends', () => {
       const frames = [frame([], { 0: { time: 0.5, langs: { 'de-DE': 'Guten Tag', 'en-US': 'Good day' } } })]
       const session = new PlaybackSession(PERFORMANCE_ID, 'track', frames, 0, false, settings())
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
       playChunks(1)
 
       expect(german.received[1].chunk).toEqual({ ttsInstructions: { time: 0.5, phrase: 'Guten Tag' } })
@@ -143,7 +144,7 @@ describe('what a playback session sends', () => {
       const frames = [frame([partial(0), partial(1)])]
       const session = new PlaybackSession(PERFORMANCE_ID, 'track', frames, 0, false, settings({ mode: 'nonChoir' }))
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
       playChunks(1)
 
       const allocated = [one, two].flatMap((device) => device.received[1]?.chunk.partials ?? [])
@@ -158,7 +159,7 @@ describe('what a playback session sends', () => {
       const frames = [frame([partial(0)]), frame([partial(0)])]
       const session = new PlaybackSession(PERFORMANCE_ID, 'track', frames, 0, false, settings({ mode: 'nonChoir' }))
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
       playChunks(1)
       audience.roster.devices = [early, late]
       playChunks(1)
@@ -176,7 +177,7 @@ describe('what a playback session sends', () => {
       const frames = [frame([], { 0: { time: 0.5, langs: { 'en-US': 'hello' } } })]
       const session = new PlaybackSession(PERFORMANCE_ID, 'track', frames, 0, false, settings({ mode: 'nonChoir' }))
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
       playChunks(1)
 
       expect(device.received[1].chunk).toEqual({ partials: [], ttsInstructions: { time: 0.5, phrase: 'hello' } })
@@ -190,7 +191,7 @@ describe('what a playback session sends', () => {
       const frames = [frame([partial(0)]), frame([partial(0)]), frame([partial(0)])]
       const session = new PlaybackSession(PERFORMANCE_ID, 'track', frames, 2, false, settings())
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
       playChunks(1)
 
       // Chunk 2 is sent first, and dated as if the run had begun two chunks ago.
@@ -203,7 +204,7 @@ describe('what a playback session sends', () => {
       const audience = audienceOf([playing, silent])
       const session = new PlaybackSession(PERFORMANCE_ID, 'track', [frame([partial(0)])], 0, false, settings())
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
       playChunks(2)
 
       expect(playing.received.at(-1)).toEqual({ stop: true })
@@ -217,7 +218,7 @@ describe('what a playback session sends', () => {
       const frames = [frame([partial(0)]), frame([partial(0)])]
       const session = new PlaybackSession(PERFORMANCE_ID, 'track', frames, 0, true, settings())
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
       playChunks(3)
 
       const startTimes = device.received.slice(1).map((message) => message.startTime)
@@ -231,7 +232,7 @@ describe('what a playback session sends', () => {
       const frames = [frame([partial(0)]), frame([partial(0)]), frame([partial(0)])]
       const session = new PlaybackSession(PERFORMANCE_ID, 'track', frames, 0, false, settings())
 
-      session.start(100, audience.read)
+      session.start(100, audience.read, noPerformanceLog)
       playChunks(1)
       session.stop()
       playChunks(5)

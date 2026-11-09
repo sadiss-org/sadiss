@@ -4,6 +4,7 @@ import { PlaybackProgress } from '../playbackSession'
 import { logger } from '../tools'
 import { ClientInfoMessage, CURRENT_PROTOCOL_VERSION, readProtocolVersion } from '../types'
 import { measurementService } from './measurement'
+import { performanceLogs } from './performanceLogs'
 import { v4 as uuidv4 } from 'uuid'
 import { SadissWebSocketServer, SadissWebSocket } from '../lib/SadissWebsocket'
 import { AdminRegistrationMessage, readInboundMessage } from '../lib/inboundMessage'
@@ -128,7 +129,20 @@ const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) 
   client.send('clientInfoReceived')
   // Tell the device how often to run the clock-sync round trip.
   client.send(JSON.stringify(measurementService.buildConfigMessage()))
+
+  logOf(client)?.write({
+    type: 'register',
+    connection: client.id,
+    openedAt: client.openedAt,
+    choirId: client.choirId,
+    ttsLang: client.ttsLang,
+    protocolVersion: client.protocolVersion
+  })
 }
+
+/** The log of the performance a device registered for. None for an admin, or a socket that never said. */
+const logOf = (client: SadissWebSocket) =>
+  client.performanceId && !client.isAdmin ? performanceLogs.for(client.performanceId) : undefined
 
 /**
  * What an admin is given is the state of the room: how many devices are
@@ -174,8 +188,9 @@ const mayFollow = async (userId: string, performanceId: string) => {
   }
 }
 
-const handleClose = (client: SadissWebSocket) => () => {
+const handleClose = (client: SadissWebSocket) => (event: WebSocket.CloseEvent) => {
   logger.info(`Client has disconnected! id: ${client.id}`)
+  logOf(client)?.write({ type: 'disconnect', connection: client.id, reason: client.closeReason, code: event.code })
 }
 
 const handlePong = (client: SadissWebSocket) => () => {
@@ -196,7 +211,12 @@ const limitsFor = (client: SadissWebSocket, quiet: LivenessLimits) =>
 const watchConnections = (wss: SadissWebSocketServer, options?: HeartbeatOptions) =>
   startHeartbeat(
     () => wss.clients,
-    (client) => logger.info(`${client.isAdmin ? 'Admin' : 'Client'} went quiet and was given up on! id: ${client.id}`),
+    (client) => {
+      // The socket is already terminated, but ws reports the close only on a
+      // later tick, so the reason set here is the one the close handler reads.
+      client.closeReason = 'heartbeat'
+      logger.info(`${client.isAdmin ? 'Admin' : 'Client'} went quiet and was given up on! id: ${client.id}`)
+    },
     (client) => limitsFor(client, options?.quiet ?? LIMITS_FOR_A_QUIET_PEER),
     options?.tickMs ?? DEFAULT_TICK_MS
   )

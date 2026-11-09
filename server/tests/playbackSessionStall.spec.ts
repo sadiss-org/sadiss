@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PlaybackSession } from '../playbackSession'
+import { noPerformanceLog } from '../lib/performanceLog'
 import { Recipient } from '../lib/audience'
 import { Frame, PartialChunk, TrackSettings } from '../types'
 import { logger } from '../tools'
@@ -75,7 +76,7 @@ describe('a playback session that falls behind', () => {
   const startPlaying = (frames: Frame[], loop = false, startAtChunk = 0) => {
     const phone = device()
     const session = new PlaybackSession(PERFORMANCE_ID, 'track', frames, startAtChunk, loop, settings)
-    session.start(Date.now() / 1000, () => [phone.recipient])
+    session.start(Date.now() / 1000, () => [phone.recipient], noPerformanceLog)
     return { phone, session }
   }
 
