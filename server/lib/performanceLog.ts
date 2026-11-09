@@ -40,14 +40,11 @@ export type PerformanceRecord =
 export interface PerformanceLog {
   /** Adds a record, stamped with the time it was written. Never waits. */
   write(record: PerformanceRecord): void
-  /** Ends the stream. Records written afterwards are ignored. */
-  close(): void
 }
 
 /** A log that keeps nothing, for when no log was asked for. */
 export const noPerformanceLog: PerformanceLog = {
-  write: () => undefined,
-  close: () => undefined
+  write: () => undefined
 }
 
 /**
@@ -57,7 +54,13 @@ export const noPerformanceLog: PerformanceLog = {
  * A stream that fails is reported once and written to no more, so a full disk
  * takes the log down and leaves the performance alone.
  */
-export const createPerformanceLog = (stream: Writable, now: () => number): PerformanceLog => {
+export const createPerformanceLog = (
+  stream: Writable,
+  now: () => number
+): PerformanceLog & {
+  /** Ends the stream. Records written afterwards are ignored. */
+  close(): void
+} => {
   let open = true
   let backedUp = false
   let dropped = 0

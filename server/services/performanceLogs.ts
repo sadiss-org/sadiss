@@ -20,7 +20,7 @@ const IDLE_MS = 10 * 60 * 1000
 const SWEEP_MS = 60 * 1000
 
 interface OpenFile {
-  log: PerformanceLog
+  log: ReturnType<typeof createPerformanceLog>
   lastWrittenAt: number
 }
 
@@ -93,8 +93,7 @@ const createPerformanceLogs = (initialDir: string | null) => {
      * it is written.
      */
     for: (performanceKey: string): PerformanceLog => ({
-      write: (record) => write(performanceKey, record),
-      close: () => closeFile(performanceKey)
+      write: (record) => write(performanceKey, record)
     }),
 
     /** Closes every open file and writes from now on to `newDir`, or nowhere when it is null. */
