@@ -4,10 +4,11 @@ import { PlaybackProgress } from '../playbackSession'
 import { logger } from '../tools'
 import { ClientInfoMessage, CURRENT_PROTOCOL_VERSION, readProtocolVersion } from '../types'
 import { measurementService } from './measurement'
-import { performanceLogs } from './performanceLogs'
+import { performanceLogFiles } from './performanceLogFiles'
 import { v4 as uuidv4 } from 'uuid'
 import { SadissWebSocketServer, SadissWebSocket } from '../lib/SadissWebsocket'
 import { AdminRegistrationMessage, readInboundMessage } from '../lib/inboundMessage'
+import { performanceOfDevice } from '../lib/audience'
 import { authenticatedUserId } from '../lib/adminAuth'
 import { SadissPerformance, visibleTo } from '../models/sadissPerformance'
 import { isValidObjectId } from 'mongoose'
@@ -62,6 +63,7 @@ export const startWebSocketServer = (port = 0, options: WebSocketServerOptions =
     logger.info(`New client connected! Assigned id: ${client.id} Total clients: ${wss.clients.size}`)
 
     setupClientEventHandlers(wss, client)
+    performanceLogFiles.server.write({ type: 'connect', connection: client.id })
   })
 
   return wss
@@ -88,7 +90,9 @@ const handleMessage = (wss: SadissWebSocketServer, client: SadissWebSocket) => (
   client.lastSeenAt = Date.now()
 
   try {
-    const parsed = readInboundMessage(event.data.toString())
+    const parsed = readInboundMessage(event.data.toString(), (message) =>
+      performanceLogFiles.server.write({ type: 'malformedMessage', connection: client.id, message })
+    )
     if (!parsed) {
       return
     }
@@ -130,6 +134,30 @@ const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) 
   // Tell the device how often to run the clock-sync round trip.
   client.send(JSON.stringify(measurementService.buildConfigMessage()))
 
+  void logRegistration(client)
+}
+
+/**
+ * Writes a device's register record once the performance it named is found to
+ * exist. Nothing is logged for an id that does not: any socket can send any id,
+ * and each one logged would open a file.
+ */
+const logRegistration = async (client: SadissWebSocket) => {
+  const performanceId = performanceOfDevice(client)
+  if (!performanceId) return
+
+  let lookup = client.performanceLookup
+  if (lookup?.performanceId !== performanceId) {
+    lookup = { performanceId, exists: performanceExists(performanceId) }
+    client.performanceLookup = lookup
+  }
+
+  // While it was looked up, the socket may have closed or named another performance.
+  if (!(await lookup.exists) || client.readyState !== WebSocket.OPEN || performanceOfDevice(client) !== performanceId) {
+    return
+  }
+
+  client.loggedPerformanceId = performanceId
   logOf(client)?.write({
     type: 'register',
     connection: client.id,
@@ -140,9 +168,26 @@ const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) 
   })
 }
 
-/** The log of the performance a device registered for. None for an admin, or a socket that never said. */
-const logOf = (client: SadissWebSocket) =>
-  client.performanceId && !client.isAdmin ? performanceLogs.for(client.performanceId) : undefined
+/** Whether a performance with this id exists. No when the lookup fails, so nothing is logged under an id nobody checked. */
+const performanceExists = async (performanceId: string) => {
+  if (!isValidObjectId(performanceId)) return false
+
+  try {
+    return !!(await SadissPerformance.exists({ _id: performanceId }))
+  } catch (err) {
+    logger.error(`Failed checking whether performance ${performanceId} exists:`, err)
+    return false
+  }
+}
+
+/**
+ * The log of the performance a device plays, once that performance was found to
+ * exist. None for an admin, or a socket that never named a real one.
+ */
+const logOf = (client: SadissWebSocket) => {
+  const performanceId = performanceOfDevice(client)
+  return performanceId && performanceId === client.loggedPerformanceId ? performanceLogFiles.for(performanceId) : undefined
+}
 
 /**
  * What an admin is given is the state of the room: how many devices are
@@ -190,7 +235,14 @@ const mayFollow = async (userId: string, performanceId: string) => {
 
 const handleClose = (client: SadissWebSocket) => (event: WebSocket.CloseEvent) => {
   logger.info(`Client has disconnected! id: ${client.id}`)
-  logOf(client)?.write({ type: 'disconnect', connection: client.id, reason: client.closeReason, code: event.code })
+
+  const closed = { connection: client.id, reason: client.closeReason, code: event.code }
+  const log = logOf(client)
+  if (log) {
+    log.write({ type: 'disconnect', ...closed })
+  } else if (!client.performanceId && !client.isAdmin) {
+    performanceLogFiles.server.write({ type: 'closedUnregistered', ...closed })
+  }
 }
 
 const handlePong = (client: SadissWebSocket) => () => {

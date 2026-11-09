@@ -1,6 +1,7 @@
 import { Server, WebSocketServer, ServerOptions, WebSocket } from 'ws'
 import { logger } from '../tools'
 import { UNVERSIONED_PROTOCOL_VERSION } from '../types'
+import { CloseReason } from './performanceLog'
 
 export class SadissWebSocket extends WebSocket {
   id = ''
@@ -20,13 +21,21 @@ export class SadissWebSocket extends WebSocket {
    * is told apart from one that belongs to another.
    */
   performanceId = ''
+  /**
+   * The performance this device's records are logged under: its `performanceId`
+   * once that was found to name a performance that exists, empty until then. Any
+   * socket can name any id, and only a real one may open a log file.
+   */
+  loggedPerformanceId = ''
+  /**
+   * The performance id last looked up for this socket and whether it exists, so
+   * a device that sends the same clientInfo again is not looked up again.
+   */
+  performanceLookup?: { performanceId: string; exists: Promise<boolean> }
   /** When the socket opened, in milliseconds on the server's clock. */
   readonly openedAt = Date.now()
-  /**
-   * Why the socket closed, as the performance log records it: `heartbeat` when
-   * the server gave up on a peer that went quiet, `closed` for everything else.
-   */
-  closeReason: 'closed' | 'heartbeat' = 'closed'
+  /** Why the socket closed, as the performance log records it. */
+  closeReason: CloseReason = 'closed'
   /** When this peer was last heard from. See lib/heartbeat.ts. */
   lastSeenAt = Date.now()
   /**

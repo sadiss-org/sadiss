@@ -6,14 +6,17 @@ import { Types } from 'mongoose'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { agent } from './setupTests'
 import { createTestPerformance, createTestTrack } from './testUtils'
-import { performanceLogs } from '../services/performanceLogs'
+import { performanceLogFiles } from '../services/performanceLogFiles'
+import { SadissPerformance } from '../models/sadissPerformance'
 import { startWebSocketServer } from '../services/webSocketService'
 import { SadissWebSocketServer } from '../lib/SadissWebsocket'
 import { CURRENT_PROTOCOL_VERSION, TrackDocument } from '../types'
 
 /**
- * The performance log file, written by the running server: devices joining and
- * leaving, and a track an admin starts that runs out on its own.
+ * The performance log files, written by the running server: devices joining and
+ * leaving, a track an admin starts that runs out on its own, and in the
+ * server-wide file what happens to a connection before it belongs to a
+ * performance.
  */
 
 const ttsLang = { iso: 'en-US', lang: 'English' }
@@ -22,11 +25,11 @@ let dir = ''
 
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'performance-log-'))
-  performanceLogs.writeTo(dir)
+  performanceLogFiles.writeTo(dir)
 })
 
 afterEach(() => {
-  performanceLogs.writeTo(null)
+  performanceLogFiles.writeTo(null)
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
@@ -48,6 +51,7 @@ const openDevice = async (wss: SadissWebSocketServer, options: WebSocket.ClientO
 
 /** Says which performance the device plays, as a current build does, and waits to be acknowledged. */
 const register = async (device: { ws: WebSocket; frames: string[] }, performanceId: string, choirId: number) => {
+  const acknowledged = device.frames.filter((frame) => frame === 'clientInfoReceived').length
   device.ws.send(
     JSON.stringify({
       message: 'clientInfo',
@@ -57,7 +61,10 @@ const register = async (device: { ws: WebSocket; frames: string[] }, performance
       protocolVersion: CURRENT_PROTOCOL_VERSION
     })
   )
-  await waitFor('registration', () => device.frames.includes('clientInfoReceived') || undefined)
+  await waitFor(
+    'registration',
+    () => device.frames.filter((frame) => frame === 'clientInfoReceived').length > acknowledged || undefined
+  )
 }
 
 const waitFor = async <T>(what: string, read: () => T | undefined, timeoutMs = 15000) => {
@@ -72,9 +79,9 @@ const waitFor = async <T>(what: string, read: () => T | undefined, timeoutMs = 1
   throw new Error(`Timed out after ${timeoutMs}ms waiting for ${what}`)
 }
 
-/** The records in a performance's log file so far. */
-const recordsOf = (performanceId: string): any[] => {
-  const file = path.join(dir, `performance-${performanceId}.jsonl`)
+/** The records in a log file so far: a performance's, or the server-wide one. */
+const recordsOf = (performanceId: string | 'server'): any[] => {
+  const file = path.join(dir, performanceId === 'server' ? 'server.jsonl' : `performance-${performanceId}.jsonl`)
   if (!fs.existsSync(file)) return []
   return fs
     .readFileSync(file, 'utf8')
@@ -83,7 +90,7 @@ const recordsOf = (performanceId: string): any[] => {
     .map((line) => JSON.parse(line))
 }
 
-const waitForRecords = (performanceId: string, count: number) =>
+const waitForRecords = (performanceId: string | 'server', count: number) =>
   waitFor(`${count} records`, () => {
     const records = recordsOf(performanceId)
     return records.length >= count ? records : undefined
@@ -103,6 +110,8 @@ describe('the performance log file', () => {
 
     await register(soprano, performanceId, 0)
     await register(alto, performanceId, 1)
+    // A register record waits on the performance being looked up.
+    await waitForRecords(performanceId, 2)
 
     await agent.post('/api/track/start').send({ trackId: track._id, performanceId }).expect(200)
     await waitFor('the stop announcement', () => soprano.frames.find((frame) => frame === '{"stop":true}'))
@@ -135,11 +144,19 @@ describe('the performance log file', () => {
     for (let i = 1; i < records.length; i++) {
       expect(records[i].t).toBeGreaterThanOrEqual(records[i - 1].t)
     }
+
+    // Each connection opened before it registered, recorded in the server-wide file.
+    const connects = recordsOf('server').filter((record) => record.type === 'connect')
+    for (const registered of records.slice(0, 2)) {
+      const connect = connects.find((record) => record.connection === registered.connection)
+      expect(connect).toEqual({ t: expect.any(Number), type: 'connect', connection: registered.connection })
+      expect(connect.t).toBeLessThanOrEqual(registered.t)
+    }
   })
 
   it('records that the heartbeat gave up on a device that went quiet', { timeout: 10000 }, async () => {
     const wss = startWebSocketServer(0, { heartbeat: { tickMs: 20, quiet: { pingAfterMs: 60, idleTimeoutMs: 200 } } })
-    const performanceId = new Types.ObjectId().toString()
+    const performanceId = (await createTestPerformance()).toString()
 
     try {
       const device = await openDevice(wss, { autoPong: false })
@@ -168,7 +185,7 @@ describe('the performance log file', () => {
 
   it('closes a file after ten minutes without a record, and opens it again for the next one', async () => {
     const performanceId = new Types.ObjectId().toString()
-    const log = performanceLogs.for(performanceId)
+    const log = performanceLogFiles.for(performanceId)
     const file = path.join(dir, `performance-${performanceId}.jsonl`)
     const movedAway = path.join(dir, 'moved-away.jsonl')
 
@@ -184,12 +201,141 @@ describe('the performance log file', () => {
     expect(fs.readFileSync(movedAway, 'utf8')).not.toContain('second')
   })
 
-  it('records nothing for a socket that never says which performance it plays', { timeout: 10000 }, async () => {
+  it(
+    'records a socket that connects and closes without registering in the server-wide file only',
+    { timeout: 10000 },
+    async () => {
+      const device = await openDevice(global.testWss)
+      device.ws.close()
+
+      const records = await waitForRecords('server', 2)
+      const connection = records[0].connection
+
+      expect(records).toEqual([
+        { t: expect.any(Number), type: 'connect', connection },
+        { t: expect.any(Number), type: 'closedUnregistered', connection, reason: 'closed', code: 1005 }
+      ])
+      expect(fs.readdirSync(dir)).toEqual(['server.jsonl'])
+    }
+  )
+
+  it(
+    'records each message it cannot read, and a socket a malformed clientInfo left unregistered',
+    { timeout: 10000 },
+    async () => {
+      const device = await openDevice(global.testWss)
+      device.ws.send(JSON.stringify({ message: 'clientInfo', clientId: 'soprano', ttsLang, performanceId: 'x' }))
+      device.ws.send(JSON.stringify({ message: 'measure', t0: 'now' }))
+      device.ws.close()
+
+      const records = await waitForRecords('server', 4)
+      const connection = records[0].connection
+
+      expect(records.map(({ t, ...record }) => record)).toEqual([
+        { type: 'connect', connection },
+        { type: 'malformedMessage', connection, message: 'clientInfo' },
+        { type: 'malformedMessage', connection, message: 'measure' },
+        { type: 'closedUnregistered', connection, reason: 'closed', code: 1005 }
+      ])
+    }
+  )
+
+  it(
+    'logs nothing under a performance id that names no performance, and still answers the device',
+    { timeout: 10000 },
+    async () => {
+      const unknown = new Types.ObjectId().toString()
+      const device = await openDevice(global.testWss)
+
+      await register(device, unknown, 0)
+      await register(device, '../../not-an-id', 0)
+      await waitFor('the clock-sync config', () => device.frames.find((frame) => frame.includes('measureConfig')))
+      device.ws.close()
+
+      // The close of a device that registered goes to no file, so the connect is the only record.
+      await waitForRecords('server', 1)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      expect(device.frames.filter((frame) => frame === 'clientInfoReceived')).toHaveLength(2)
+      expect(fs.readdirSync(dir)).toEqual(['server.jsonl'])
+      expect(recordsOf('server').map((record) => record.type)).toEqual(['connect'])
+    }
+  )
+
+  it('looks a performance up once for a device that sends the same clientInfo again', { timeout: 10000 }, async () => {
+    const performanceId = (await createTestPerformance()).toString()
+    const lookups = vi.spyOn(SadissPerformance, 'exists')
     const device = await openDevice(global.testWss)
+
+    await register(device, performanceId, 0)
+    await register(device, performanceId, 2)
+
+    const records = await waitForRecords(performanceId, 2)
+    expect(records.map((record) => [record.type, record.choirId])).toEqual([
+      ['register', 0],
+      ['register', 2]
+    ])
+    expect(lookups).toHaveBeenCalledTimes(1)
     device.ws.close()
-    await new Promise((resolve) => device.ws.on('close', resolve))
+  })
+
+  it('creates the directory as soon as it is set, before any record', () => {
+    const nested = path.join(dir, 'nested', 'logs')
+    performanceLogFiles.writeTo(nested)
+
+    expect(fs.statSync(nested).isDirectory()).toBe(true)
+  })
+
+  it('opens a file whose stream failed again a minute later, starting with how many records it missed', async () => {
+    const performanceId = new Types.ObjectId().toString()
+    const file = path.join(dir, `performance-${performanceId}.jsonl`)
+    const log = performanceLogFiles.for(performanceId)
+
+    // A directory where the file should be makes opening it fail.
+    fs.mkdirSync(file)
+    log.write({ type: 'ended', trackId: 'into the failing stream' })
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    expect(fs.readdirSync(dir)).toEqual([])
+    log.write({ type: 'ended', trackId: 'missed' })
+    log.write({ type: 'ended', trackId: 'missed' })
+    fs.rmdirSync(file)
+    vi.advanceTimersByTime(30 * 1000)
+    log.write({ type: 'ended', trackId: 'missed' })
+
+    vi.advanceTimersByTime(31 * 1000)
+    log.write({ type: 'ended', trackId: 'after' })
+
+    expect((await waitForRecords(performanceId, 2)).map(({ t, ...record }) => record)).toEqual([
+      { type: 'dropped', count: 3 },
+      { type: 'ended', trackId: 'after' }
+    ])
+  })
+
+  it('creates a directory it could not create again a minute later, and says how many records it missed', async () => {
+    const blocker = path.join(dir, 'blocker')
+    fs.writeFileSync(blocker, '')
+    const logDir = path.join(blocker, 'logs')
+    performanceLogFiles.writeTo(logDir)
+
+    const performanceId = new Types.ObjectId().toString()
+    const log = performanceLogFiles.for(performanceId)
+    log.write({ type: 'ended', trackId: 'missed' })
+    log.write({ type: 'ended', trackId: 'missed' })
+
+    fs.rmSync(blocker)
+    vi.advanceTimersByTime(61 * 1000)
+
+    const file = path.join(logDir, `performance-${performanceId}.jsonl`)
+    await waitFor('the reopened file', () => (fs.existsSync(file) && fs.readFileSync(file, 'utf8')) || undefined)
+    log.write({ type: 'ended', trackId: 'after' })
+
+    const records = await waitFor('two records', () => {
+      const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean)
+      return lines.length >= 2 ? lines.map((line) => JSON.parse(line)) : undefined
+    })
+    expect(records.map(({ t, ...record }) => record)).toEqual([
+      { type: 'dropped', count: 2 },
+      { type: 'ended', trackId: 'after' }
+    ])
   })
 })

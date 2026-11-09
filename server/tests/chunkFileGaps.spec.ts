@@ -71,7 +71,7 @@ describe('a chunk file with gaps', () => {
       waveform: 'sine',
       ttsRate: 1
     })
-    session.start(Date.now() / 1000, () => [phone])
+    session.start(Date.now() / 1000, () => [phone], { write: () => undefined })
 
     vi.advanceTimersByTime(5000)
     // A blocked event loop: the clock moves on and no timer runs in between.

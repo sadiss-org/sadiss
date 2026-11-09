@@ -85,10 +85,12 @@ describe('a performance log', () => {
     const stream = new Keeps()
     const log = createPerformanceLog(stream, () => 1)
 
+    expect(log.failed).toBe(false)
     stream.emit('error', new Error('disk full'))
     log.write({ type: 'ended', trackId: 'track' })
 
     expect(stream.lines).toEqual([])
+    expect(log.failed).toBe(true)
   })
 })
 
@@ -181,7 +183,35 @@ describe('what a playback session records', () => {
 
     vi.advanceTimersByTime(5500)
     session.stop()
+    vi.advanceTimersByTime(1000)
 
     expect(records().map((record) => record.type)).toEqual(['start', 'loop', 'loop', 'stop'])
+  })
+
+  it('a stop only once the devices have been told, as it does a start and an end', () => {
+    const timeline: string[] = []
+    const phone = {
+      id: 'phone',
+      choirId: 0,
+      ttsLang: { iso: 'en-US', lang: 'English' },
+      send: (data: string) => {
+        const message = JSON.parse(data)
+        if (message.start || message.stop) timeline.push(`told ${data}`)
+      }
+    }
+    const session = new PlaybackSession('650000000000000000000001', 'track', frames, 0, false, {
+      mode: 'choir',
+      waveform: 'sine',
+      ttsRate: 1
+    })
+    session.start(100, () => [phone], { write: (record) => timeline.push(`recorded ${record.type}`) })
+
+    vi.advanceTimersByTime(1000)
+    session.stop()
+    session.stop()
+    expect(timeline).toEqual(['told {"start":true}', 'recorded start'])
+
+    vi.advanceTimersByTime(5000)
+    expect(timeline).toEqual(['told {"start":true}', 'recorded start', 'told {"stop":true}', 'recorded stop'])
   })
 })

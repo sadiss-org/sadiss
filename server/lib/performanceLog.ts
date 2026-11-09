@@ -11,7 +11,7 @@
 import { Writable } from 'stream'
 import { logger } from '../tools'
 
-/** Something the log records, told apart by `type`. */
+/** Something a performance's log records, told apart by `type`. */
 export type PerformanceRecord =
   /** A device said which performance it plays, in which voice and language. */
   | {
@@ -25,7 +25,7 @@ export type PerformanceRecord =
       protocolVersion: number
     }
   /** A registered device's socket closed: by the device or the network, or because the heartbeat gave up on it. */
-  | { type: 'disconnect'; connection: string; reason: 'closed' | 'heartbeat'; code: number }
+  | { type: 'disconnect'; connection: string; reason: CloseReason; code: number }
   /** An admin started a track. */
   | { type: 'start'; trackId: string; loop: boolean; startAtChunk: number }
   /** An admin stopped the track that was playing. */
@@ -34,17 +34,35 @@ export type PerformanceRecord =
   | { type: 'loop'; trackId: string }
   /** A track that does not loop ran out. */
   | { type: 'ended'; trackId: string }
-  /** How many records were thrown away while the stream was backed up. */
-  | { type: 'dropped'; count: number }
+  | DroppedRecord
 
-export interface PerformanceLog {
+/**
+ * Something the server-wide log records: what happens to a connection before it
+ * belongs to a performance. Each carries the connection id its performance's
+ * records carry later, so the two files can be read together.
+ */
+export type ServerRecord =
+  /** A socket opened. */
+  | { type: 'connect'; connection: string }
+  /**
+   * A socket sent one of the messages the server accepts, named in `message`, in
+   * a shape it cannot read, so the message was ignored. A clientInfo ignored this
+   * way leaves the device unregistered.
+   */
+  | { type: 'malformedMessage'; connection: string; message: string }
+  /** A socket closed without having named a performance or registered as an admin. */
+  | { type: 'closedUnregistered'; connection: string; reason: CloseReason; code: number }
+  | DroppedRecord
+
+/** Why a socket closed: `heartbeat` when the server gave up on a peer that went quiet, `closed` for everything else. */
+export type CloseReason = 'closed' | 'heartbeat'
+
+/** How many records were thrown away while they could not be written. */
+type DroppedRecord = { type: 'dropped'; count: number }
+
+export interface PerformanceLog<R extends { type: string } = PerformanceRecord> {
   /** Adds a record, stamped with the time it was written. Never waits. */
-  write(record: PerformanceRecord): void
-}
-
-/** A log that keeps nothing, for when no log was asked for. */
-export const noPerformanceLog: PerformanceLog = {
-  write: () => undefined
+  write(record: R): void
 }
 
 /**
@@ -52,20 +70,24 @@ export const noPerformanceLog: PerformanceLog = {
  * milliseconds.
  *
  * A stream that fails is reported once and written to no more, so a full disk
- * takes the log down and leaves the performance alone.
+ * takes the log down and leaves the performance alone. `failed` says it has, so
+ * the owner of the stream can count what it can no longer write and open another.
  */
-export const createPerformanceLog = (
+export const createPerformanceLog = <R extends { type: string } = PerformanceRecord>(
   stream: Writable,
   now: () => number
-): PerformanceLog & {
+): PerformanceLog<R | DroppedRecord> & {
   /** Ends the stream. Records written afterwards are ignored. */
   close(): void
+  /** Whether the stream failed, after which nothing more is written. */
+  readonly failed: boolean
 } => {
   let open = true
+  let failed = false
   let backedUp = false
   let dropped = 0
 
-  const append = (record: PerformanceRecord) => {
+  const append = (record: R | DroppedRecord) => {
     if (stream.write(JSON.stringify({ t: now(), ...record }) + '\n')) return
 
     backedUp = true
@@ -84,6 +106,7 @@ export const createPerformanceLog = (
   stream.on('error', (err) => {
     if (open) logger.error('Performance log stopped writing:', err.message)
     open = false
+    failed = true
   })
 
   return {
@@ -99,6 +122,9 @@ export const createPerformanceLog = (
       if (!open) return
       open = false
       stream.end()
+    },
+    get failed() {
+      return failed
     }
   }
 }
