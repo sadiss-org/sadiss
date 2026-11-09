@@ -49,6 +49,8 @@ export class PlaybackSession {
    * the time since the start does not say which chunk went out last.
    */
   private sentChunk = 0
+  /** Ends the run that is going on: set by `start`, and called by `stop` and by the track running out. */
+  private finish?: (record: { type: 'stop' | 'ended'; trackId: string }) => void
   readonly performanceKey: string
 
   constructor(
@@ -64,8 +66,15 @@ export class PlaybackSession {
 
   isRunning = () => this.running
 
-  /** Stops a run an admin no longer wants. The devices are told, and the stop recorded, on the next tick. */
-  stop = () => (this.running = false)
+  /**
+   * Stops a run an admin no longer wants, at once: the devices are told, then
+   * the stop is recorded, and no chunk of this run goes out afterwards.
+   */
+  stop = () => {
+    if (!this.finish) return
+    logger.info('Sending interval stopped.')
+    this.finish({ type: 'stop', trackId: this.trackId })
+  }
 
   /** Where this run has got to, which is what an admin is shown. */
   progress = (): PlaybackProgress =>
@@ -154,12 +163,6 @@ export class PlaybackSession {
 
     const step = () => {
       logger.info(`Performing ${this.performanceKey} @ chunk ${chunkIndex}`)
-      if (!this.running) {
-        logger.info('Sending interval stopped.')
-        reset()
-        log.write({ type: 'stop', trackId: this.trackId })
-        return
-      }
 
       const behindMs = Date.now() - expected
       const skipped = skipChunksAlreadyOver()
@@ -189,7 +192,7 @@ export class PlaybackSession {
       chunkIndex++
 
       expected += CHUNK_INTERVAL_MS
-      setTimeout(step, Math.max(0, CHUNK_INTERVAL_MS - dt))
+      nextStep = setTimeout(step, Math.max(0, CHUNK_INTERVAL_MS - dt))
     }
 
     /** The date every chunk of the current round is sent with. */
@@ -223,17 +226,24 @@ export class PlaybackSession {
       return skipped
     }
 
-    // Start
-    setTimeout(step, CHUNK_INTERVAL_MS)
-    log.write({ type: 'start', trackId: this.trackId, loop: this.loop, startAtChunk: this.startAtChunk })
+    /** The next step, while one is due. */
+    let nextStep: NodeJS.Timeout | undefined
 
-    const reset = () => {
+    this.finish = (record) => {
+      this.finish = undefined
+      this.running = false
+      clearTimeout(nextStep)
       partialMap = {}
       chunkIndex = 0
 
       // Notify all clients of track end
       announce({ stop: true })
+      log.write(record)
     }
+
+    // Start
+    nextStep = setTimeout(step, CHUNK_INTERVAL_MS)
+    log.write({ type: 'start', trackId: this.trackId, loop: this.loop, startAtChunk: this.startAtChunk })
 
     const handleTrackEnd = () => {
       if (chunkIndex >= this.frames.length) {
@@ -243,9 +253,7 @@ export class PlaybackSession {
           return true
         } else {
           logger.info('No more chunks. Stopping.')
-          this.running = false
-          reset()
-          log.write({ type: 'ended', trackId: this.trackId })
+          this.finish?.({ type: 'ended', trackId: this.trackId })
           return false
         }
       }

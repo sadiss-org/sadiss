@@ -4,13 +4,14 @@ import path from 'path'
 import WebSocket from 'ws'
 import { Types } from 'mongoose'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { agent } from './setupTests'
+import { agent, authCookie } from './setupTests'
 import { createTestPerformance, createTestTrack } from './testUtils'
 import { performanceLogFiles } from '../services/performanceLogFiles'
 import { SadissPerformance } from '../models/sadissPerformance'
 import { startWebSocketServer } from '../services/webSocketService'
 import { SadissWebSocketServer } from '../lib/SadissWebsocket'
 import { CURRENT_PROTOCOL_VERSION, TrackDocument } from '../types'
+import { logger } from '../tools'
 
 /**
  * The performance log files, written by the running server: devices joining and
@@ -213,7 +214,7 @@ describe('the performance log file', () => {
 
       expect(records).toEqual([
         { t: expect.any(Number), type: 'connect', connection },
-        { t: expect.any(Number), type: 'closedUnregistered', connection, reason: 'closed', code: 1005 }
+        { t: expect.any(Number), type: 'disconnect', connection, reason: 'closed', code: 1005 }
       ])
       expect(fs.readdirSync(dir)).toEqual(['server.jsonl'])
     }
@@ -235,13 +236,13 @@ describe('the performance log file', () => {
         { type: 'connect', connection },
         { type: 'malformedMessage', connection, message: 'clientInfo' },
         { type: 'malformedMessage', connection, message: 'measure' },
-        { type: 'closedUnregistered', connection, reason: 'closed', code: 1005 }
+        { type: 'disconnect', connection, reason: 'closed', code: 1005 }
       ])
     }
   )
 
   it(
-    'logs nothing under a performance id that names no performance, and still answers the device',
+    'logs nothing under a performance id that names no performance, still answers the device, and records its close in the server-wide file',
     { timeout: 10000 },
     async () => {
       const unknown = new Types.ObjectId().toString()
@@ -252,15 +253,105 @@ describe('the performance log file', () => {
       await waitFor('the clock-sync config', () => device.frames.find((frame) => frame.includes('measureConfig')))
       device.ws.close()
 
-      // The close of a device that registered goes to no file, so the connect is the only record.
-      await waitForRecords('server', 1)
+      const records = await waitForRecords('server', 2)
       await new Promise((resolve) => setTimeout(resolve, 100))
 
       expect(device.frames.filter((frame) => frame === 'clientInfoReceived')).toHaveLength(2)
       expect(fs.readdirSync(dir)).toEqual(['server.jsonl'])
-      expect(recordsOf('server').map((record) => record.type)).toEqual(['connect'])
+      expect(recordsOf('server').map(({ t, ...record }) => record)).toEqual([
+        { type: 'connect', connection: records[0].connection },
+        { type: 'disconnect', connection: records[0].connection, reason: 'closed', code: 1005 }
+      ])
     }
   )
+
+  it(
+    'records the close of a device whose performance is still being looked up in the server-wide file',
+    { timeout: 10000 },
+    async () => {
+      const performanceId = (await createTestPerformance()).toString()
+      const exists = SadissPerformance.exists.bind(SadissPerformance)
+      // The socket goes while its performance is being looked up.
+      vi.spyOn(SadissPerformance, 'exists').mockImplementationOnce((filter) => {
+        for (const client of global.testWss.clients) if (client.performanceId === performanceId) client.terminate()
+        return exists(filter)
+      })
+      const device = await openDevice(global.testWss)
+
+      await register(device, performanceId, 0)
+
+      const records = await waitForRecords('server', 2)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      expect(records.map((record) => record.type)).toEqual(['connect', 'disconnect'])
+      expect(recordsOf(performanceId)).toEqual([])
+    }
+  )
+
+  it(
+    'records a device that switches to another performance as having left the first, and its close where its records went next',
+    { timeout: 10000 },
+    async () => {
+      const first = (await createTestPerformance()).toString()
+      const unknown = new Types.ObjectId().toString()
+      const device = await openDevice(global.testWss)
+
+      await register(device, first, 0)
+      await waitForRecords(first, 1)
+      await register(device, unknown, 0)
+      device.ws.close()
+
+      const server = await waitForRecords('server', 2)
+      const connection = server[0].connection
+      expect(recordsOf(first).map(({ t, ...record }) => record)).toEqual([
+        expect.objectContaining({ type: 'register', connection }),
+        { type: 'disconnect', connection, reason: 'switched' }
+      ])
+      expect(server.map(({ t, ...record }) => record)).toEqual([
+        { type: 'connect', connection },
+        { type: 'disconnect', connection, reason: 'closed', code: 1005 }
+      ])
+    }
+  )
+
+  it(
+    'says on the console why a performance could not be looked up, for a device and for an admin alike',
+    { timeout: 10000 },
+    async () => {
+      const performanceId = (await createTestPerformance()).toString()
+      const errors = vi.spyOn(logger, 'error')
+      vi.spyOn(SadissPerformance, 'exists').mockImplementation(() => {
+        throw new Error('connection to the database was lost')
+      })
+
+      const device = await openDevice(global.testWss)
+      await register(device, performanceId, 0)
+      const admin = await openDevice(global.testWss, { headers: { Cookie: authCookie } })
+      admin.ws.send(JSON.stringify({ message: 'isAdmin', performanceId }))
+
+      await waitFor('both lookups to fail', () => (errors.mock.calls.length >= 2 ? true : undefined))
+      expect(errors.mock.calls.map(([message]) => message)).toEqual([
+        expect.stringMatching(/exists: connection to the database was lost$/),
+        expect.stringMatching(/is visible to .*: connection to the database was lost$/)
+      ])
+      device.ws.close()
+      admin.ws.close()
+      // Both closes are recorded before the next test reads its files.
+      await waitForRecords('server', 4)
+    }
+  )
+
+  it('records the close of an admin in the server-wide file', { timeout: 10000 }, async () => {
+    const performanceId = (await createTestPerformance()).toString()
+    const admin = await openDevice(global.testWss, { headers: { Cookie: authCookie } })
+
+    admin.ws.send(JSON.stringify({ message: 'isAdmin', performanceId }))
+    await waitFor('the first admin info', () => admin.frames.find((frame) => frame.includes('adminInfo')))
+    admin.ws.close()
+
+    const records = await waitForRecords('server', 2)
+    expect(records.map((record) => record.type)).toEqual(['connect', 'disconnect'])
+    expect(recordsOf(performanceId)).toEqual([])
+  })
 
   it('looks a performance up once for a device that sends the same clientInfo again', { timeout: 10000 }, async () => {
     const performanceId = (await createTestPerformance()).toString()
@@ -305,8 +396,9 @@ describe('the performance log file', () => {
     vi.advanceTimersByTime(31 * 1000)
     log.write({ type: 'ended', trackId: 'after' })
 
+    // The record that went into the stream before it failed is counted too.
     expect((await waitForRecords(performanceId, 2)).map(({ t, ...record }) => record)).toEqual([
-      { type: 'dropped', count: 3 },
+      { type: 'dropped', count: 4 },
       { type: 'ended', trackId: 'after' }
     ])
   })
@@ -321,6 +413,8 @@ describe('the performance log file', () => {
     const log = performanceLogFiles.for(performanceId)
     log.write({ type: 'ended', trackId: 'missed' })
     log.write({ type: 'ended', trackId: 'missed' })
+    // Opening the file fails on its own time.
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     fs.rmSync(blocker)
     vi.advanceTimersByTime(61 * 1000)
@@ -337,5 +431,41 @@ describe('the performance log file', () => {
       { type: 'dropped', count: 2 },
       { type: 'ended', trackId: 'after' }
     ])
+  })
+
+  it('creates the directory again when it was removed, and says how many records it missed', async () => {
+    fs.rmSync(dir, { recursive: true })
+    const performanceId = new Types.ObjectId().toString()
+    const log = performanceLogFiles.for(performanceId)
+
+    log.write({ type: 'ended', trackId: 'missed' })
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    vi.advanceTimersByTime(61 * 1000)
+    log.write({ type: 'ended', trackId: 'after' })
+
+    expect((await waitForRecords(performanceId, 2)).map(({ t, ...record }) => record)).toEqual([
+      { type: 'dropped', count: 1 },
+      { type: 'ended', trackId: 'after' }
+    ])
+  })
+
+  it('keeps a file that could not be written past ten minutes, until it has said how many records it missed', async () => {
+    const performanceId = new Types.ObjectId().toString()
+    const file = path.join(dir, `performance-${performanceId}.jsonl`)
+    const log = performanceLogFiles.for(performanceId)
+
+    fs.mkdirSync(file)
+    log.write({ type: 'ended', trackId: 'missed' })
+    // Each minute the file is tried again and fails again.
+    for (let minute = 0; minute < 11; minute++) {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      vi.advanceTimersByTime(60 * 1000)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    fs.rmdirSync(file)
+    vi.advanceTimersByTime(61 * 1000)
+
+    expect((await waitForRecords(performanceId, 1)).map(({ t, ...record }) => record)).toEqual([{ type: 'dropped', count: 1 }])
   })
 })

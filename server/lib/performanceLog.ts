@@ -1,15 +1,12 @@
 /**
- * A structured log of what happened during one performance, one JSON object per
- * line, for working out afterwards what went wrong on which phone.
- *
- * Logging must never cost the performance anything, so nothing here waits on the
- * disk. Records go into the stream's buffer; once the stream says that buffer is
- * full, further records are dropped and counted, and the count is written as a
- * record of its own when the stream has caught up.
+ * What the log files record: a performance's file of what happened during it,
+ * one JSON object per line, for working out afterwards what went wrong on which
+ * phone, and the server-wide file of connections that belong to no performance
+ * yet. Both are written as record logs (lib/recordLog.ts), which also write a
+ * `dropped` record wherever lines were lost.
  */
 
-import { Writable } from 'stream'
-import { logger } from '../tools'
+import { RecordLog } from './recordLog'
 
 /** Something a performance's log records, told apart by `type`. */
 export type PerformanceRecord =
@@ -25,7 +22,9 @@ export type PerformanceRecord =
       protocolVersion: number
     }
   /** A registered device's socket closed: by the device or the network, or because the heartbeat gave up on it. */
-  | { type: 'disconnect'; connection: string; reason: CloseReason; code: number }
+  | Disconnect
+  /** A registered device said it plays another performance, so its records go elsewhere from now on. */
+  | { type: 'disconnect'; connection: string; reason: 'switched' }
   /** An admin started a track. */
   | { type: 'start'; trackId: string; loop: boolean; startAtChunk: number }
   /** An admin stopped the track that was playing. */
@@ -34,11 +33,10 @@ export type PerformanceRecord =
   | { type: 'loop'; trackId: string }
   /** A track that does not loop ran out. */
   | { type: 'ended'; trackId: string }
-  | DroppedRecord
 
 /**
- * Something the server-wide log records: what happens to a connection before it
- * belongs to a performance. Each carries the connection id its performance's
+ * Something the server-wide log records: what happens to a connection while its
+ * records go to no performance's file. Each carries the connection id its performance's
  * records carry later, so the two files can be read together.
  */
 export type ServerRecord =
@@ -50,81 +48,21 @@ export type ServerRecord =
    * way leaves the device unregistered.
    */
   | { type: 'malformedMessage'; connection: string; message: string }
-  /** A socket closed without having named a performance or registered as an admin. */
-  | { type: 'closedUnregistered'; connection: string; reason: CloseReason; code: number }
-  | DroppedRecord
+  /**
+   * A socket closed whose records were not going to a performance's file: one
+   * that never registered, an admin, or a device whose performance does not
+   * exist, is still being looked up, or that it switched away from.
+   */
+  | Disconnect
 
 /** Why a socket closed: `heartbeat` when the server gave up on a peer that went quiet, `closed` for everything else. */
 export type CloseReason = 'closed' | 'heartbeat'
 
-/** How many records were thrown away while they could not be written. */
-type DroppedRecord = { type: 'dropped'; count: number }
+/** A socket closed, with its close code. */
+type Disconnect = { type: 'disconnect'; connection: string; reason: CloseReason; code: number }
 
-export interface PerformanceLog<R extends { type: string } = PerformanceRecord> {
-  /** Adds a record, stamped with the time it was written. Never waits. */
-  write(record: R): void
-}
+/** The log of one performance. */
+export type PerformanceLog = RecordLog<PerformanceRecord>
 
-/**
- * A log writing to `stream`. `now` is the clock the records are stamped with, in
- * milliseconds.
- *
- * A stream that fails is reported once and written to no more, so a full disk
- * takes the log down and leaves the performance alone. `failed` says it has, so
- * the owner of the stream can count what it can no longer write and open another.
- */
-export const createPerformanceLog = <R extends { type: string } = PerformanceRecord>(
-  stream: Writable,
-  now: () => number
-): PerformanceLog<R | DroppedRecord> & {
-  /** Ends the stream. Records written afterwards are ignored. */
-  close(): void
-  /** Whether the stream failed, after which nothing more is written. */
-  readonly failed: boolean
-} => {
-  let open = true
-  let failed = false
-  let backedUp = false
-  let dropped = 0
-
-  const append = (record: R | DroppedRecord) => {
-    if (stream.write(JSON.stringify({ t: now(), ...record }) + '\n')) return
-
-    backedUp = true
-    stream.once('drain', catchUp)
-  }
-
-  const catchUp = () => {
-    backedUp = false
-    if (!open || !dropped) return
-
-    const count = dropped
-    dropped = 0
-    append({ type: 'dropped', count })
-  }
-
-  stream.on('error', (err) => {
-    if (open) logger.error('Performance log stopped writing:', err.message)
-    open = false
-    failed = true
-  })
-
-  return {
-    write: (record) => {
-      if (!open) return
-      if (backedUp) {
-        dropped++
-        return
-      }
-      append(record)
-    },
-    close: () => {
-      if (!open) return
-      open = false
-      stream.end()
-    },
-    get failed() {
-      return failed
-    }
-  }
-}
+/** The server-wide log. */
+export type ServerLog = RecordLog<ServerRecord>

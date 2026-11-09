@@ -1,135 +1,70 @@
 import fs from 'fs'
 import path from 'path'
-import { createPerformanceLog, PerformanceLog, PerformanceRecord, ServerRecord } from '../lib/performanceLog'
+import { PerformanceLog, PerformanceRecord, ServerLog, ServerRecord } from '../lib/performanceLog'
+import { createRecordLog } from '../lib/recordLog'
 import { logger } from '../tools'
 
 /**
  * The application-wide log files, in the directory `PERFORMANCE_LOG_DIR` names:
  * `performance-<id>.jsonl` for each performance, and `server.jsonl` for what
- * happens to a connection before it belongs to one. Nothing is written when it
+ * happens to a connection while it belongs to none. Nothing is written when it
  * is unset. The directory can be changed at runtime with
  * `performanceLogFiles.writeTo(...)`.
  *
  * A file is opened by its first record and closed after ten minutes without one,
  * so a performance that is over lets go of its file without anyone having to say
- * it is over. A later record opens it again and appends.
+ * it is over. A later record opens it again and appends. A file stays open while
+ * it has lines not yet known to be written, so a count of lost lines it still
+ * owes is not thrown away.
  *
- * A file that cannot be written, because its stream failed or the directory
- * could not be created, is tried again a minute later. Records arriving
- * meanwhile are dropped and counted, and the first line written once it works
- * again is a `dropped` record with that count.
+ * Each file is a record log (lib/recordLog.ts), which tries a file that could
+ * not be written again a minute later and counts what it lost meanwhile. Here
+ * the directory is made again for that next try, in case it was removed.
  */
 
 const IDLE_MS = 10 * 60 * 1000
 
-/** How long a file that could not be written is left alone before it is tried again. */
-const RETRY_MS = 60 * 1000
-
-/** How often files are checked for having gone idle, or for being due another try. */
+/** How often files are checked for having gone idle. */
 const SWEEP_MS = 60 * 1000
 
 type AnyRecord = PerformanceRecord | ServerRecord
 
 interface LogFile {
-  /** The writer, while the file is open and has not failed. */
-  log?: ReturnType<typeof createPerformanceLog<AnyRecord>>
+  log: ReturnType<typeof createRecordLog<AnyRecord>>
   lastWrittenAt: number
-  /** When a file that could not be written may be opened again. */
-  retryAt: number
-  /** Records thrown away since the file stopped working, still to be written as one `dropped` record. */
-  dropped: number
 }
 
-const reasonOf = (err: unknown) => (err instanceof Error ? err.message : err)
+const reasonOf = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
 const createPerformanceLogFiles = (initialDir: string | null) => {
   let dir: string | null = null
-  /** Whether `dir` exists. While it does not, records are dropped and counted. */
-  let dirReady = false
-  let dirRetryAt = 0
-  let creatingDir = false
   const files = new Map<string, LogFile>()
   let sweeper: NodeJS.Timeout | undefined
 
-  const dirFailed = (failedDir: string, err: unknown) => {
-    logger.error(`Performance logs cannot create ${failedDir}, trying again in a minute:`, reasonOf(err))
-    dirRetryAt = Date.now() + RETRY_MS
-  }
-
   /**
    * Creates the directory as soon as it is set, so the first record does not
-   * wait on the disk to do it.
+   * wait on the disk to do it, and a directory that cannot be made is reported
+   * at once.
    */
   const useDir = (newDir: string | null) => {
     dir = newDir
-    dirReady = false
-    dirRetryAt = 0
-    creatingDir = false
     if (!newDir) return
 
     try {
       fs.mkdirSync(newDir, { recursive: true })
-      dirReady = true
     } catch (err) {
-      dirFailed(newDir, err)
+      logger.error(`Performance logs cannot create ${newDir} (${reasonOf(err)}), each file tries again when it is written`)
     }
   }
 
-  /** Tries creating the directory again once that is due, without waiting for it. */
-  const retryDir = () => {
-    if (!dir || creatingDir || Date.now() < dirRetryAt) return
-
-    const retried = dir
-    creatingDir = true
-    fs.promises.mkdir(retried, { recursive: true }).then(
-      () => {
-        if (dir !== retried) return
-        creatingDir = false
-        dirReady = true
-        for (const [name, file] of files) if (file.dropped) openIfDue(name, file)
-      },
-      (err) => {
-        if (dir !== retried) return
-        creatingDir = false
-        dirFailed(retried, err)
-      }
-    )
-  }
-
-  /**
-   * The working writer for a file, opening it when that is due. Undefined while
-   * the file cannot be written. A file reopened after a failure first says how
-   * many records it missed; the count is let go of once the file has opened, so
-   * a reopen that fails again keeps it for the next one.
-   */
-  const openIfDue = (name: string, file: LogFile) => {
-    if (file.log?.failed) {
-      file.log = undefined
-      file.retryAt = Date.now() + RETRY_MS
-    }
-    if (file.log) return file.log
-
-    if (!dir || !dirReady) {
-      retryDir()
-      return undefined
-    }
-    if (Date.now() < file.retryAt) return undefined
-
-    const stream = fs.createWriteStream(path.join(dir, name), { flags: 'a' })
-    const log = createPerformanceLog<AnyRecord>(stream, Date.now)
-    file.log = log
-
-    const missed = file.dropped
-    if (missed) {
-      log.write({ type: 'dropped', count: missed })
-      stream.once('open', () => (file.dropped -= missed))
-    }
-
-    return log
+  /** Opens a file for appending. Once it failed, the directory is made again first. */
+  const opener = (fileDir: string, name: string) => (afterFailure: boolean) => {
+    if (afterFailure) fs.mkdirSync(fileDir, { recursive: true })
+    return fs.createWriteStream(path.join(fileDir, name), { flags: 'a' })
   }
 
   const closeFile = (name: string) => {
-    files.get(name)?.log?.close()
+    files.get(name)?.log.close()
     files.delete(name)
     if (!files.size && sweeper) {
       clearInterval(sweeper)
@@ -140,8 +75,7 @@ const createPerformanceLogFiles = (initialDir: string | null) => {
   const sweep = () => {
     const now = Date.now()
     for (const [name, file] of files) {
-      if (file.dropped) openIfDue(name, file)
-      if (now - file.lastWrittenAt >= IDLE_MS) closeFile(name)
+      if (now - file.lastWrittenAt >= IDLE_MS && !file.log.unsettled) closeFile(name)
     }
   }
 
@@ -150,7 +84,7 @@ const createPerformanceLogFiles = (initialDir: string | null) => {
 
     let file = files.get(name)
     if (!file) {
-      file = { lastWrittenAt: 0, retryAt: 0, dropped: 0 }
+      file = { log: createRecordLog<AnyRecord>(name, opener(dir, name), Date.now), lastWrittenAt: 0 }
       files.set(name, file)
     }
     file.lastWrittenAt = Date.now()
@@ -161,12 +95,10 @@ const createPerformanceLogFiles = (initialDir: string | null) => {
       sweeper.unref()
     }
 
-    const log = openIfDue(name, file)
-    if (log) log.write(record)
-    else file.dropped++
+    file.log.write(record)
   }
 
-  const server: PerformanceLog<ServerRecord> = { write: (record) => write('server.jsonl', record) }
+  const server: ServerLog = { write: (record) => write('server.jsonl', record) }
 
   useDir(initialDir)
 
@@ -182,7 +114,7 @@ const createPerformanceLogFiles = (initialDir: string | null) => {
       return { write: (record) => write(name, record) }
     },
 
-    /** The server-wide log, of connections that do not belong to a performance yet. */
+    /** The server-wide log, of connections that belong to no performance. */
     server,
 
     /** Closes every open file and writes from now on to `newDir`, or nowhere when it is null. */

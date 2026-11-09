@@ -23,8 +23,9 @@ export class SadissWebSocket extends WebSocket {
   performanceId = ''
   /**
    * The performance this device's records are logged under: its `performanceId`
-   * once that was found to name a performance that exists, empty until then. Any
-   * socket can name any id, and only a real one may open a log file.
+   * once that was found to name a performance that exists, empty until then and
+   * from when it names another. Any socket can name any id, and only a real one
+   * may open a log file. Empty sends its records to the server-wide file.
    */
   loggedPerformanceId = ''
   /**
