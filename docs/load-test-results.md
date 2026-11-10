@@ -2,6 +2,23 @@
 
 What load tests against the capacity instance found. How to run them is in [`loadtest/README.md`](../loadtest/README.md); each run's figures are in its results file in [`loadtest/results/`](../loadtest/results/).
 
+## Logging on and off, 2026-11-10: no difference beyond run-to-run noise
+
+The performance log (PR #199) against the capacity instance, at the last step today's ramp passed: 100 phones, 10 of them joining during the track, a nonChoir track of 30 chunks with 16 partials per frame. Two runs with `PERFORMANCE_LOG_DIR` unset, then two with it set, the instance restarted in between. Server commit `0c565a68`; generator and network as in the ramps below.
+
+| Run | Results file | Outcome | Arrival p1 | Arrival median | Arrival min | Round trip median | Round trip p99 | Server CPU max | Server memory max |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Off 1 | [`2026-11-10T1752Z`](../loadtest/results/2026-11-10T1752Z-sadiss.net-capacity-server-100p.json) | PASS | 887 ms | 926 ms | 871 ms | 23.5 ms | 40 ms | 8.1% | 119 MB |
+| Off 2 | [`2026-11-10T1754Z`](../loadtest/results/2026-11-10T1754Z-sadiss.net-capacity-server-100p.json) | FAIL | 148 ms | 916 ms | -1273 ms | 24.4 ms | 259 ms | 3.8% | 121 MB |
+| On 1 | [`2026-11-10T1756Z`](../loadtest/results/2026-11-10T1756Z-sadiss.net-capacity-server-100p.json) | PASS | 782 ms | 921 ms | 757 ms | 23.7 ms | 107 ms | 5.9% | 131 MB |
+| On 2 | [`2026-11-10T1758Z`](../loadtest/results/2026-11-10T1758Z-sadiss.net-capacity-server-100p.json) | PASS | 685 ms | 927 ms | 85 ms | 23.5 ms | 56 ms | 5.2% | 120 MB |
+
+No run missed a chunk or dropped a phone; the generator's event loop p99 stayed under 1 ms. Each logged run wrote 100 `register`, one `start`, one `ended` and 100 `disconnect` to its performance file, and `server.jsonl` 200 `connect`; no `dropped` record.
+
+Measured: the median arrival and round trip are the same with and without the log, and the server stayed under 9% of one core either way. The run that failed had logging off: a burst of slow round trips on the path, like the ramps' breaks.
+
+Not measured here: the server's own event-loop lag (the load test samples CPU and memory, not the event loop), and how many phones the server carries with the log on, since this path breaks before the server does.
+
 ## Ramp, 2026-11-10: broke at 125 phones, the same way, from the same WiFi
 
 The ramp of 2026-11-08 repeated with the same server, generator and network, to see whether 175 phones repeats.
