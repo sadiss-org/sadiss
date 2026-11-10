@@ -22,12 +22,38 @@
 export interface MeasurementConfig {
   /** Target interval (ms) between clock-sync round trips. */
   intervalMs: number
+  /** Present and true while devices are to send a report on their state with each ping. */
+  report?: true
 }
 
 /** Client → server: a clock-sync ping carrying the client send timestamp. */
 export interface MeasureMessage {
   message: 'measure'
   t0: number
+  /** The phone's state, from protocol version 3 on, while the config asks for it. */
+  report?: PhoneReport
+}
+
+/**
+ * A phone's state at one clock-sync ping, as the app sends it
+ * (app/src/types/measurement.ts), for the performance log. Every figure is as
+ * the phone reports it, and null where it could not give it or sent something
+ * of the wrong kind.
+ */
+export interface PhoneReport {
+  clock: { offsetMs: number | null; rttMs: number | null; roundTrips: number | null; connectedForMs: number | null } | null
+  audio: {
+    scheduleOffsetS: number | null
+    calibrationS: number | null
+    state: string | null
+    outputLatency: number | null
+    baseLatency: number | null
+    sampleRate: number | null
+    outputTimestamp: { contextTime: number | null; performanceTime: number | null } | null
+  } | null
+  visible: boolean | null
+  keepAlivePlaying: boolean | null
+  lastChunk: { index: number | null; leadMs: number | null } | null
 }
 
 /** Server → client: the ping echoed back with server clock stamps. */

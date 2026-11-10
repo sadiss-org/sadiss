@@ -105,6 +105,8 @@ const handleMessage = (wss: SadissWebSocketServer, client: SadissWebSocket) => (
       case 'measure':
         client.reportsRegularly = true
         measurementService.handleMeasure(client, parsed)
+        // After the answer, so the round trip never waits on the log.
+        if (parsed.report) connectionLog.write(client, { type: 'phone', deviceId: client.device?.id ?? null, ...parsed.report })
         break
       case 'isAdmin':
         registerAdmin(wss, client, parsed).catch((err: unknown) => logHandlingFailure(client, err))

@@ -60,5 +60,17 @@ describe('measurementService', () => {
         config: { intervalMs: 5000 }
       })
     })
+
+    it('asks devices for a report on their state with each ping while reports are wanted', () => {
+      const service = createMeasurementService({ clock: fakeClock([0]), config: defaultConfig, reportsWanted: () => true })
+
+      expect(service.buildConfigMessage()).toEqual({ message: 'measureConfig', config: { intervalMs: 3000, report: true } })
+    })
+
+    it('leaves the report out of the config while none is wanted, so the message is what older servers sent', () => {
+      const service = createMeasurementService({ clock: fakeClock([0]), config: defaultConfig, reportsWanted: () => false })
+
+      expect(JSON.stringify(service.buildConfigMessage())).toBe('{"message":"measureConfig","config":{"intervalMs":3000}}')
+    })
   })
 })

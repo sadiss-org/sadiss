@@ -18,6 +18,8 @@ export interface MeasurementClient {
 export interface MeasurementServiceDeps {
   clock: Clock
   config: MeasurementConfig
+  /** Whether devices are to send a report on their state with each ping, read each time the config is sent. */
+  reportsWanted?: () => boolean
 }
 
 export interface MeasurementService {
@@ -37,7 +39,11 @@ export interface MeasurementService {
  * its own offset from that. There is no enable/disable switch — the round trip
  * IS the shared clock, so devices must always be able to run it.
  */
-export const createMeasurementService = ({ clock, config }: MeasurementServiceDeps): MeasurementService => {
+export const createMeasurementService = ({
+  clock,
+  config,
+  reportsWanted = () => false
+}: MeasurementServiceDeps): MeasurementService => {
   let activeConfig = config
 
   return {
@@ -53,7 +59,8 @@ export const createMeasurementService = ({ clock, config }: MeasurementServiceDe
     },
 
     buildConfigMessage() {
-      return { message: 'measureConfig', config: activeConfig }
+      // Left out rather than false while none is wanted, so the message is the one older servers sent.
+      return { message: 'measureConfig', config: reportsWanted() ? { ...activeConfig, report: true } : activeConfig }
     },
 
     reportingIntervalMs() {

@@ -6,7 +6,7 @@
  */
 
 import { DroppedRecord, RecordLog } from './recordLog'
-import { DeviceIdentity } from '../types'
+import { DeviceIdentity, PhoneReport } from '../types'
 
 /** Something a performance's log records, told apart by `type`. */
 export type PerformanceRecord =
@@ -58,6 +58,8 @@ export type ConnectionRecord =
   | { type: 'malformedMessage'; connection: string; message: string }
   /** The socket closed: by the device or the network, or because the heartbeat gave up on it. */
   | Disconnect
+  /** A phone's state at one clock-sync ping, with the id it gave in its handshake, or null if it gave none. */
+  | ({ type: 'phone'; connection: string; deviceId: string | null } & PhoneReport)
 
 /** A device said which performance it plays, in which voice and language, and who it is when it said. */
 export type Register = {

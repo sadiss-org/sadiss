@@ -89,7 +89,7 @@ the operator sees the outdated devices before starting and can have them updated
 | ------- | ------ |
 | 1 | The unversioned handshake. Everything shipped before protocol versioning. |
 | 2 | `clientInfo` carries `protocolVersion`. No playback message changed. |
-| 3 | `clientInfo` carries `device`, who the phone is (below). No playback message changed. |
+| 3 | `clientInfo` carries `device`, who the phone is; `measure` may carry `report`, the phone's state, while `measureConfig` asks for it (both below). No playback message changed. |
 
 ## Who a phone is (version 3)
 
@@ -112,4 +112,46 @@ Only the performance log reads `device`: its `register` record carries it, or
 `unidentified: true` for a build that does not send it. A `device` that is not
 an object of seven strings is dropped and the phone registers without it, so a
 malformed identity never costs a phone its place in the performance.
+
+## What a phone reports with each ping (version 3)
+
+While the server keeps a performance log, `measureConfig` says so with
+`report: true`:
+
+```json
+{ "message": "measureConfig", "config": { "intervalMs": 3000, "report": true } }
+```
+
+Without a log, or with `PHONE_REPORTS=off` in the server's environment, the
+field is left out, so the message is the one earlier servers sent; a phone
+treats a config without it as no. While it is true, each `measure` carries the
+phone's state:
+
+```json
+{ "message": "measure", "t0": 123456.7,
+  "report": {
+    "clock": { "offsetMs": 1794334190000.5, "rttMs": 28.4, "roundTrips": 20, "connectedForMs": 61000 },
+    "audio": { "scheduleOffsetS": 1794334185.2, "calibrationS": 0.12, "state": "running",
+               "outputLatency": 0.04, "baseLatency": 0.005, "sampleRate": 48000,
+               "outputTimestamp": { "contextTime": 12.3, "performanceTime": 45678.9 } },
+    "visible": true, "keepAlivePlaying": true,
+    "lastChunk": { "index": 7, "leadMs": 912.4 } } }
+```
+
+- `clock`: the phone's estimate of server time minus its own clock, the median
+  round trip of the round trips that estimate uses, how many round trips it
+  holds, and how long the connection has been open.
+- `audio`: how playback is scheduled: server time minus audio-clock time, the
+  output latency set on the calibration page, and what the audio context says
+  about its state, latencies, sample rate and output timestamp.
+- `visible`: whether the app is in the foreground; `keepAlivePlaying`: whether
+  the silent sound that keeps audio alive with the screen off plays.
+- `lastChunk`: the last chunk with partials the phone was sent, and how long
+  before its first sound it arrived by the phone's clock.
+
+A figure the phone cannot give is null. The server answers the ping first and
+then writes the report as a `phone` record, with the device id from the
+handshake, to the file the connection's records go to. A figure of the wrong
+kind is logged as null, and a `report` that is not an object is ignored: the
+ping is the shared clock and is always answered.
 

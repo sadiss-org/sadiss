@@ -120,6 +120,9 @@ const createPerformanceLogFiles = (initialDir: string | null) => {
     /** The server-wide log, of connections that belong to no performance. */
     server,
 
+    /** Whether records are written anywhere: whether a directory is set. */
+    writing: () => dir !== null,
+
     /** Closes every open file and writes from now on to `newDir`, or nowhere when it is null. */
     writeTo: (newDir: string | null) => {
       for (const name of Array.from(files.keys())) closeFile(name)

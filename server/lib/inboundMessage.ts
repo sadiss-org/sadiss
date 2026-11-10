@@ -14,7 +14,7 @@
  * languages announces exactly that.
  */
 
-import { ClientInfoMessage, DeviceIdentity, MeasureMessage } from '../types'
+import { ClientInfoMessage, DeviceIdentity, MeasureMessage, PhoneReport } from '../types'
 import { logger } from '../tools'
 
 /** Client → server: an operator's interface asking to follow a performance. */
@@ -85,8 +85,53 @@ const readClientInfo = (frame: Frame): ClientInfoMessage | undefined => {
   }
 }
 
-const readMeasure = (frame: Frame): MeasureMessage | undefined =>
-  isNumber(frame.t0) ? { message: 'measure', t0: frame.t0 } : undefined
+/** The longest text a report keeps, such as an audio context's state; anything longer is read as unknown. */
+const MAX_REPORT_TEXT = 40
+
+const numberOrNull = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null)
+const booleanOrNull = (value: unknown) => (typeof value === 'boolean' ? value : null)
+const textOrNull = (value: unknown) => (typeof value === 'string' && value.length <= MAX_REPORT_TEXT ? value : null)
+
+/** A part of a report read with `read`, or null when the phone sent no object for it. */
+const partOrNull = <T>(value: unknown, read: (part: Frame) => T): T | null => (isFrame(value) ? read(value) : null)
+
+/**
+ * A phone's report, rebuilt figure by figure: a figure of the wrong kind is read
+ * as unknown rather than costing the rest. Nothing when it is not an object.
+ */
+const readPhoneReport = (value: unknown): PhoneReport | undefined => {
+  if (!isFrame(value)) return undefined
+  return {
+    clock: partOrNull(value.clock, (clock) => ({
+      offsetMs: numberOrNull(clock.offsetMs),
+      rttMs: numberOrNull(clock.rttMs),
+      roundTrips: numberOrNull(clock.roundTrips),
+      connectedForMs: numberOrNull(clock.connectedForMs)
+    })),
+    audio: partOrNull(value.audio, (audio) => ({
+      scheduleOffsetS: numberOrNull(audio.scheduleOffsetS),
+      calibrationS: numberOrNull(audio.calibrationS),
+      state: textOrNull(audio.state),
+      outputLatency: numberOrNull(audio.outputLatency),
+      baseLatency: numberOrNull(audio.baseLatency),
+      sampleRate: numberOrNull(audio.sampleRate),
+      outputTimestamp: partOrNull(audio.outputTimestamp, (stamp) => ({
+        contextTime: numberOrNull(stamp.contextTime),
+        performanceTime: numberOrNull(stamp.performanceTime)
+      }))
+    })),
+    visible: booleanOrNull(value.visible),
+    keepAlivePlaying: booleanOrNull(value.keepAlivePlaying),
+    lastChunk: partOrNull(value.lastChunk, (chunk) => ({ index: numberOrNull(chunk.index), leadMs: numberOrNull(chunk.leadMs) }))
+  }
+}
+
+const readMeasure = (frame: Frame): MeasureMessage | undefined => {
+  if (!isNumber(frame.t0)) return undefined
+  // Only the log reads the report; the ping is the shared clock and is answered whatever the report holds.
+  const report = readPhoneReport(frame.report)
+  return { message: 'measure', t0: frame.t0, ...(report && { report }) }
+}
 
 const readAdminRegistration = (frame: Frame): AdminRegistrationMessage | undefined =>
   isOptional(frame.performanceId, isString)
