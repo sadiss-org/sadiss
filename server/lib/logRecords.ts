@@ -6,20 +6,12 @@
  */
 
 import { DroppedRecord, RecordLog } from './recordLog'
+import { DeviceIdentity } from '../types'
 
 /** Something a performance's log records, told apart by `type`. */
 export type PerformanceRecord =
   /** A device said which performance it plays, in which voice and language. */
-  | {
-      type: 'register'
-      /** The server's id for this socket, new on every connection. */
-      connection: string
-      /** When the socket opened, in milliseconds on the server's clock. */
-      openedAt: number
-      choirId: number
-      ttsLang: { iso: string; lang: string }
-      protocolVersion: number
-    }
+  | Register
   /** What a registered device's connection recorded while it belonged to this performance. */
   | ConnectionRecord
   /** A registered device said it plays another performance or became an admin, so its records go elsewhere from now on. */
@@ -66,6 +58,22 @@ export type ConnectionRecord =
   | { type: 'malformedMessage'; connection: string; message: string }
   /** The socket closed: by the device or the network, or because the heartbeat gave up on it. */
   | Disconnect
+
+/** A device said which performance it plays, in which voice and language, and who it is when it said. */
+export type Register = {
+  type: 'register'
+  /** The server's id for this socket, new on every connection. */
+  connection: string
+  /** When the socket opened, in milliseconds on the server's clock. */
+  openedAt: number
+  choirId: number
+  ttsLang: { iso: string; lang: string }
+  protocolVersion: number
+} & (
+  | { device: DeviceIdentity }
+  /** A build from before protocol version 3, or one whose identity could not be read. */
+  | { unidentified: true }
+)
 
 /** Why a socket closed: `heartbeat` when the server gave up on a peer that went quiet, `closed` for everything else. */
 export type CloseReason = 'closed' | 'heartbeat'

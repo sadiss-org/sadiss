@@ -130,7 +130,8 @@ describe('the performance log file', () => {
       openedAt: expect.any(Number),
       choirId: 0,
       ttsLang,
-      protocolVersion: CURRENT_PROTOCOL_VERSION
+      protocolVersion: CURRENT_PROTOCOL_VERSION,
+      unidentified: true
     })
     expect(records[1]).toMatchObject({ choirId: 1 })
     expect(records[2]).toEqual({ t: expect.any(Number), type: 'start', trackId: String(track._id), loop: false, startAtChunk: 0 })
@@ -434,6 +435,43 @@ describe('the performance log file', () => {
       expect(fs.readdirSync(dir)).toEqual(['server.jsonl'])
     }
   )
+
+  it('records who a device is when it says, and that it did not when it does not', { timeout: 10000 }, async () => {
+    const performanceId = (await createTestPerformance()).toString()
+    const device = {
+      id: '1f0e6c3a-6a5b-4c1e-9d55-3c1f2b7a9e10',
+      appVersion: '2.2.0',
+      appBuild: '12',
+      platform: 'ios',
+      osVersion: '18.1',
+      model: 'iPhone14,5',
+      network: 'cellular'
+    }
+    const identified = await openDevice(global.testWss)
+    const unidentified = await openDevice(global.testWss)
+
+    identified.ws.send(
+      JSON.stringify({
+        message: 'clientInfo',
+        clientId: 0,
+        ttsLang,
+        performanceId,
+        protocolVersion: CURRENT_PROTOCOL_VERSION,
+        device
+      })
+    )
+    await waitForRecords(performanceId, 1)
+    await register(unidentified, performanceId, 1)
+
+    const records = await waitForRecords(performanceId, 2)
+    expect(records[0]).toMatchObject({ type: 'register', choirId: 0, device })
+    expect(records[0]).not.toHaveProperty('unidentified')
+    expect(records[1]).toMatchObject({ type: 'register', choirId: 1, unidentified: true })
+    expect(records[1]).not.toHaveProperty('device')
+    identified.ws.close()
+    unidentified.ws.close()
+    await waitForRecords(performanceId, 4)
+  })
 
   it('looks a performance up once for a device that sends the same clientInfo again', { timeout: 10000 }, async () => {
     const performanceId = (await createTestPerformance()).toString()

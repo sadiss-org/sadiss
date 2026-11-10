@@ -1,6 +1,6 @@
 import { Server, WebSocketServer, ServerOptions, WebSocket } from 'ws'
 import { logger } from '../tools'
-import { UNVERSIONED_PROTOCOL_VERSION } from '../types'
+import { DeviceIdentity, UNVERSIONED_PROTOCOL_VERSION } from '../types'
 import { CloseReason } from './logRecords'
 
 export class SadissWebSocket extends WebSocket {
@@ -21,6 +21,8 @@ export class SadissWebSocket extends WebSocket {
    * is told apart from one that belongs to another.
    */
   performanceId = ''
+  /** Who the phone said it is in its last handshake, if it said. */
+  device?: DeviceIdentity
   /** When the socket opened, in milliseconds on the server's clock. */
   readonly openedAt = Date.now()
   /** Why the socket closed, as the performance log records it. */

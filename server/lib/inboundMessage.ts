@@ -14,7 +14,7 @@
  * languages announces exactly that.
  */
 
-import { ClientInfoMessage, MeasureMessage } from '../types'
+import { ClientInfoMessage, DeviceIdentity, MeasureMessage } from '../types'
 import { logger } from '../tools'
 
 /** Client → server: an operator's interface asking to follow a performance. */
@@ -38,6 +38,26 @@ const isOptional = (value: unknown, is: (candidate: unknown) => boolean) => valu
 const isString = (value: unknown) => typeof value === 'string'
 const isNumber = (value: unknown) => typeof value === 'number'
 
+const isText = (value: unknown): value is string => typeof value === 'string'
+
+/** A phone's identity, or nothing when any field is missing or not a string. */
+const readDevice = (value: unknown): DeviceIdentity | undefined => {
+  if (!isFrame(value)) return undefined
+  const { id, appVersion, appBuild, platform, osVersion, model, network } = value
+  if (
+    isText(id) &&
+    isText(appVersion) &&
+    isText(appBuild) &&
+    isText(platform) &&
+    isText(osVersion) &&
+    isText(model) &&
+    isText(network)
+  ) {
+    return { id, appVersion, appBuild, platform, osVersion, model, network }
+  }
+  return undefined
+}
+
 const readClientInfo = (frame: Frame): ClientInfoMessage | undefined => {
   if (
     !isNumber(frame.clientId) ||
@@ -48,12 +68,16 @@ const readClientInfo = (frame: Frame): ClientInfoMessage | undefined => {
     return undefined
   }
 
+  // Only the log reads it, so a malformed one costs the log that detail, never the registration.
+  const device = readDevice(frame.device)
+
   return {
     message: 'clientInfo',
     clientId: frame.clientId as number,
     ttsLang: frame.ttsLang,
     performanceId: frame.performanceId as string,
-    protocolVersion: frame.protocolVersion as number | undefined
+    protocolVersion: frame.protocolVersion as number | undefined,
+    ...(device && { device })
   }
 }
 

@@ -89,3 +89,27 @@ the operator sees the outdated devices before starting and can have them updated
 | ------- | ------ |
 | 1 | The unversioned handshake. Everything shipped before protocol versioning. |
 | 2 | `clientInfo` carries `protocolVersion`. No playback message changed. |
+| 3 | `clientInfo` carries `device`, who the phone is (below). No playback message changed. |
+
+## Who a phone is (version 3)
+
+From version 3 the handshake carries `device`:
+
+```json
+{ "message": "clientInfo", "clientId": 3, "ttsLang": { "iso": "en-US", "lang": "English" },
+  "performanceId": "…", "protocolVersion": 3,
+  "device": { "id": "1f0e6c3a-…", "appVersion": "2.2.0", "appBuild": "12", "platform": "android",
+              "osVersion": "13", "model": "MAR-LX1A", "network": "wifi" } }
+```
+
+`id` is made up once per installation of the app and kept on the phone, so every
+connection of one phone carries the same one, across reconnects and restarts.
+The rest is what the phone reports about itself when the connection opens;
+`network` is how it reached the network at that moment, so a phone that moves
+from WiFi to mobile data says so on its next connection.
+
+Only the performance log reads `device`: its `register` record carries it, or
+`unidentified: true` for a build that does not send it. A `device` that is not
+an object of seven strings is dropped and the phone registers without it, so a
+malformed identity never costs a phone its place in the performance.
+
