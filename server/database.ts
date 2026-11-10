@@ -24,10 +24,13 @@ if (!mongoURI && !useInMemoryDb) {
 
 let mongod: MongoMemoryServer
 
-const connectDB = async () => {
+/** Connects to `uri` when given, and otherwise to the database the environment names. */
+const connectDB = async (uri?: string) => {
   if (mongoose.connection.readyState !== 1) {
     try {
-      if (useInMemoryDb) {
+      if (uri) {
+        mongoURI = uri
+      } else if (useInMemoryDb) {
         mongod = await MongoMemoryServer.create()
         mongoURI = mongod.getUri()
       }
