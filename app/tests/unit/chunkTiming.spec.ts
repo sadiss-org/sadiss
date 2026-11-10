@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import type { ChunkEnvelope } from '@server/types/ChunkEnvelope'
-import { chunkTiming } from '../src/wire'
+import { ChunkEnvelope } from '@/types/types'
+import { chunkLeadMs, chunkTiming } from '@/composables/chunkTiming'
 
 const partial = (start: number) => ({
   index: 0,
@@ -27,5 +26,19 @@ describe('when a chunk sounds and which chunk it is', () => {
   it('has no timing when the chunk carries no partials, such as one with only a phrase', () => {
     expect(chunkTiming(envelope({ partials: [], ttsInstructions: { time: 4, phrase: 'hello' } }))).toBeNull()
     expect(chunkTiming(envelope({ ttsInstructions: { time: 4, phrase: 'hello' } }))).toBeNull()
+  })
+})
+
+describe('how long before its sound a chunk arrived', () => {
+  it('is the time left until the sound by the server clock, the phone being offsetMs behind it', () => {
+    expect(chunkLeadMs(10_000, 1_000, 8_000)).toBe(1_000)
+  })
+
+  it('is negative for a chunk that arrived after its sound', () => {
+    expect(chunkLeadMs(10_000, 3_000, 8_000)).toBe(-1_000)
+  })
+
+  it('is unknown while the phone has no estimate of the server clock', () => {
+    expect(chunkLeadMs(10_000, 1_000, null)).toBeNull()
   })
 })

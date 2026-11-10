@@ -3,7 +3,7 @@ import { createClockSync } from '@/composables/clockSync'
 import { connectDevice } from '@/composables/deviceConnection'
 import type { ChunkEnvelope } from '@server/types/ChunkEnvelope'
 import { Seat } from './room'
-import { chunkTiming } from './wire'
+import { chunkLeadMs, chunkTiming } from '@/composables/chunkTiming'
 
 export interface PhoneOptions {
   wsUrl: string
@@ -93,7 +93,7 @@ export const startVirtualPhone = ({ wsUrl, performanceId, seat }: PhoneOptions):
     onPlayback: (message) => {
       if (!isChunkEnvelope(message)) return
       const offset = clockSync.clock.offsetMs()
-      const leadMs = (soundsAtServerMs: number) => (offset === null ? null : soundsAtServerMs - (performance.now() + offset))
+      const leadMs = (soundsAtServerMs: number) => chunkLeadMs(soundsAtServerMs, performance.now(), offset)
       const timing = chunkTiming(message)
       if (timing) phone.arrivals.push({ chunk: timing.chunk, leadMs: leadMs(timing.soundsAtServerMs) })
       const phrase = message.chunk.ttsInstructions
