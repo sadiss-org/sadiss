@@ -14,6 +14,12 @@ const REPLIES_MISSED_BEFORE_GIVING_UP = 3
 /** The cadence assumed until the server has said, which is also how long a new connection has to answer. */
 const ASSUMED_MEASURE_INTERVAL_MS = 3000
 
+/** A chunk's number and how long before its first sound it arrived, in ms, or null while the clock has no estimate. */
+export interface ChunkArrival {
+  chunk: number
+  leadMs: number | null
+}
+
 /** What the phone itself can say about its audio and screen, for the report. */
 export type DeviceState = Pick<PhoneReport, 'audio' | 'visible' | 'keepAlivePlaying'>
 
@@ -31,7 +37,9 @@ export interface DeviceConnectionOptions {
   url: string
   /** Who this phone is, read each time a connection opens. */
   clientInfo: () => Omit<ClientInfoMessage, 'message' | 'protocolVersion'>
-  clockSync: Pick<ClockSync, 'start' | 'handleMessage' | 'intervalMs' | 'stop'> & { clock: Pick<ClockSync['clock'], 'estimate'> }
+  clockSync: Pick<ClockSync, 'start' | 'handleMessage' | 'intervalMs' | 'stop' | 'now'> & {
+    clock: Pick<ClockSync['clock'], 'estimate'>
+  }
   /** Every message that is not about the clock: start, stop and chunks. */
   onPlayback: (message: Record<string, unknown>) => void
   onLiveChange: (live: boolean) => void
@@ -39,8 +47,12 @@ export interface DeviceConnectionOptions {
   log?: (raw: string) => void
   /** The phone's audio and screen state, for the report it sends when the server asks. */
   deviceState?: () => DeviceState
-  /** The clock the clock sync measures with, in ms. */
-  now?: () => number
+  /**
+   * Called with every chunk message after playback has it, and the chunk's
+   * number and how early it came by the phone's clock, or null for a chunk
+   * without partials.
+   */
+  onChunk?: (message: ChunkEnvelope, arrival: ChunkArrival | null) => void
   WebSocketImpl?: typeof WebSocket
 }
 
@@ -59,9 +71,11 @@ export const connectDevice = ({
   onLiveChange,
   log,
   deviceState = () => NO_DEVICE_STATE,
-  now = () => performance.now(),
+  onChunk,
   WebSocketImpl
 }: DeviceConnectionOptions) => {
+  // The clock sync's own clock, so the lead and the offset it is added to are on one clock.
+  const now = () => clockSync.now()
   let openedAt = now()
   let lastChunk: PhoneReport['lastChunk'] = null
 
@@ -75,15 +89,27 @@ export const connectDevice = ({
     }
   }
 
-  /** Keeps the last chunk with partials, and how early it came by the clock as it stood when it arrived. */
+  /**
+   * Keeps the last chunk with partials, and how early it came by the clock as it
+   * stood when it arrived. Runs after playback has the chunk, and a chunk whose
+   * timing cannot be read is only left out of the report.
+   */
   const noteChunk = (message: object) => {
     if (!isChunkEnvelope(message)) return
-    const timing = chunkTiming(message)
-    if (!timing) return
-    lastChunk = {
-      index: timing.chunk,
-      leadMs: chunkLeadMs(timing.soundsAtServerMs, now(), clockSync.clock.estimate()?.offsetMs ?? null)
+    let arrival: ChunkArrival | null = null
+    try {
+      const timing = chunkTiming(message)
+      if (timing) {
+        arrival = {
+          chunk: timing.chunk,
+          leadMs: chunkLeadMs(timing.soundsAtServerMs, now(), clockSync.clock.estimate()?.offsetMs ?? null)
+        }
+        lastChunk = { index: arrival.chunk, leadMs: arrival.leadMs }
+      }
+    } catch (err) {
+      console.warn('Could not read the timing of a chunk:', err)
     }
+    onChunk?.(message, arrival)
   }
 
   const socket = createResilientSocket({
@@ -105,8 +131,8 @@ export const connectDevice = ({
       }
       if (typeof message !== 'object' || message === null) return
       if (clockSync.handleMessage(message)) return
-      noteChunk(message)
       onPlayback({ ...message })
+      noteChunk(message)
     },
     onLiveChange,
     silenceLimitMs: () => REPLIES_MISSED_BEFORE_GIVING_UP * (clockSync.intervalMs() || ASSUMED_MEASURE_INTERVAL_MS),

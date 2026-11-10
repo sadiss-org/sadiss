@@ -5,6 +5,8 @@ import { MeasureMessage, PhoneReport } from '@/types/measurement'
 export interface ClockSync {
   /** The phone's estimate of the server clock. */
   clock: ServerClock
+  /** The phone's own clock the estimate is measured against, in ms. */
+  now(): number
   /**
    * Begins clock sync over a connection, replacing any earlier one. `report`
    * gives the phone's state, sent with each ping while the server asks for it.
@@ -60,6 +62,7 @@ export const createClockSync = ({
 
   return {
     clock,
+    now,
     start: (send, report) => {
       controller = createMeasurementController({
         now,

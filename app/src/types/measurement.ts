@@ -29,9 +29,9 @@ export interface PhoneReport {
   clock: {
     /** Its estimate of server time minus its own clock, in ms. */
     offsetMs: number
-    /** The median round trip behind that estimate, in ms. */
+    /** The median of the faster half of its round trips, which the estimate uses, in ms. */
     rttMs: number
-    /** How many round trips the estimate is made from. */
+    /** How many round trips its window holds; the estimate uses the faster half. */
     roundTrips: number
     /** How long the current connection has been open, in ms. */
     connectedForMs: number

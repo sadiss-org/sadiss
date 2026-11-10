@@ -88,4 +88,25 @@ describe('measurementController', () => {
     controller.ping()
     expect(sent).toEqual([{ message: 'measure', t0: 500 }])
   })
+
+  it('stamps the ping after the report is made, so making it does not count toward the round trip', () => {
+    const order: string[] = []
+    const sent: unknown[] = []
+    const controller = createMeasurementController({
+      now: () => {
+        order.push('stamped')
+        return 500
+      },
+      send: (message) => sent.push(message),
+      report: () => {
+        order.push('report made')
+        return report
+      }
+    })
+    controller.handleMessage({ message: 'measureConfig', config: { intervalMs: 3000, report: true } })
+
+    controller.ping()
+
+    expect(order).toEqual(['report made', 'stamped'])
+  })
 })

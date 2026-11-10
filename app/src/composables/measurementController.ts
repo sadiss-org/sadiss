@@ -68,8 +68,9 @@ export const createMeasurementController = ({
     },
 
     ping() {
-      const t0 = now()
-      send(config.report ? { message: 'measure', t0, ...reportOrNothing(report) } : { message: 'measure', t0 })
+      // Made before the stamp, so making it does not count toward the round trip.
+      const extra = config.report ? reportOrNothing(report) : {}
+      send({ message: 'measure', t0: now(), ...extra })
     },
 
     handleMessage(message) {
