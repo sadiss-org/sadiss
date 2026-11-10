@@ -42,14 +42,16 @@ export type PlaybackProgress =
  * on the one already playing.
  */
 export class PlaybackSession {
-  private running = false
   /**
    * The chunk this run last sent. Recorded rather than worked out from the clock,
    * because a run that falls behind skips the chunks that are already over, so
    * the time since the start does not say which chunk went out last.
    */
   private sentChunk = 0
-  /** Ends the run that is going on: set by `start`, and called by `stop` and by the track running out. */
+  /**
+   * Ends the run that is going on: set by `start`, and called by `stop` and by
+   * the track running out. Set exactly while a run is going on.
+   */
   private finish?: (record: { type: 'stop' | 'ended'; trackId: string }) => void
   readonly performanceKey: string
 
@@ -64,7 +66,7 @@ export class PlaybackSession {
     this.performanceKey = String(performanceId)
   }
 
-  isRunning = () => this.running
+  isRunning = () => this.finish !== undefined
 
   /**
    * Stops a run an admin no longer wants, at once: the devices are told, then
@@ -78,7 +80,7 @@ export class PlaybackSession {
 
   /** Where this run has got to, which is what an admin is shown. */
   progress = (): PlaybackProgress =>
-    this.running
+    this.isRunning()
       ? {
           playing: true,
           trackId: this.trackId,
@@ -101,7 +103,7 @@ export class PlaybackSession {
    * More or less accurate timer taken from https://stackoverflow.com/a/29972322/16725862
    */
   start = (startTime: number, audienceNow: () => Recipient[], log: PerformanceLog) => {
-    if (this.running) {
+    if (this.isRunning()) {
       return false
     }
 
@@ -111,8 +113,6 @@ export class PlaybackSession {
         device.send(JSON.stringify(message))
       }
     }
-
-    this.running = true
 
     announce({ start: true })
 
@@ -231,7 +231,6 @@ export class PlaybackSession {
 
     this.finish = (record) => {
       this.finish = undefined
-      this.running = false
       clearTimeout(nextStep)
       partialMap = {}
       chunkIndex = 0
