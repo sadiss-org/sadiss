@@ -1,6 +1,7 @@
 import { Server, WebSocketServer, ServerOptions, WebSocket } from 'ws'
 import { logger } from '../tools'
 import { UNVERSIONED_PROTOCOL_VERSION } from '../types'
+import { CloseReason } from './logRecords'
 
 export class SadissWebSocket extends WebSocket {
   id = ''
@@ -20,6 +21,10 @@ export class SadissWebSocket extends WebSocket {
    * is told apart from one that belongs to another.
    */
   performanceId = ''
+  /** When the socket opened, in milliseconds on the server's clock. */
+  readonly openedAt = Date.now()
+  /** Why the socket closed, as the performance log records it. */
+  closeReason: CloseReason = 'closed'
   /** When this peer was last heard from. See lib/heartbeat.ts. */
   lastSeenAt = Date.now()
   /**

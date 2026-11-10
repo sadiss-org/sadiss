@@ -44,7 +44,7 @@ describe('a playback session with a chunk that cannot be sent', () => {
       waveform: 'sine',
       ttsRate: 1
     })
-    session.start(Date.now() / 1000, () => [phone])
+    session.start(Date.now() / 1000, () => [phone], { write: () => undefined })
 
     vi.advanceTimersByTime(2500)
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { webSocketAudience } from '../lib/audience'
+import { performanceOfDevice, webSocketAudience } from '../lib/audience'
 import { SadissWebSocketServer } from '../lib/SadissWebsocket'
 
 /**
@@ -78,5 +78,17 @@ describe('the audience of a performance', () => {
     expect(readAudience()).toHaveLength(1)
     clients.add(connection('second'))
     expect(readAudience()).toHaveLength(2)
+  })
+})
+
+describe('the performance a connection plays as a device', () => {
+  it('is the one it named, read as a string', () => {
+    expect(performanceOfDevice(connection('device'))).toBe(PERFORMANCE)
+    expect(performanceOfDevice(connection('object', { performanceId: { toString: () => PERFORMANCE } }))).toBe(PERFORMANCE)
+  })
+
+  it('is none for an admin watching it, or a connection that has not said', () => {
+    expect(performanceOfDevice(connection('admin', { isAdmin: true }))).toBe('')
+    expect(performanceOfDevice(connection('new', { performanceId: '' }))).toBe('')
   })
 })

@@ -1,10 +1,11 @@
 import { Frame, TrackSettings } from './types'
 import { Types } from 'mongoose'
-import { logger } from './tools'
+import { logger, reasonOf } from './tools'
 import { Recipient } from './lib/audience'
 import { PartialMap } from './partialDistribution'
 import { payloadsForChunk } from './chunkPayloads'
 import { CHUNK_SECONDS } from './types/ChunkEnvelope'
+import { PerformanceLog } from './lib/logRecords'
 
 const CHUNK_INTERVAL_MS = CHUNK_SECONDS * 1000
 
@@ -41,13 +42,17 @@ export type PlaybackProgress =
  * on the one already playing.
  */
 export class PlaybackSession {
-  private running = false
   /**
    * The chunk this run last sent. Recorded rather than worked out from the clock,
    * because a run that falls behind skips the chunks that are already over, so
    * the time since the start does not say which chunk went out last.
    */
   private sentChunk = 0
+  /**
+   * Ends the run that is going on: set by `start`, and called by `stop` and by
+   * the track running out. Set exactly while a run is going on.
+   */
+  private finish?: (record: { type: 'stop' | 'ended'; trackId: string }) => void
   readonly performanceKey: string
 
   constructor(
@@ -61,13 +66,21 @@ export class PlaybackSession {
     this.performanceKey = String(performanceId)
   }
 
-  isRunning = () => this.running
+  isRunning = () => this.finish !== undefined
 
-  stop = () => (this.running = false)
+  /**
+   * Stops a run an admin no longer wants, at once: the devices are told, then
+   * the stop is recorded, and no chunk of this run goes out afterwards.
+   */
+  stop = () => {
+    if (!this.finish) return
+    logger.info('Sending interval stopped.')
+    this.finish({ type: 'stop', trackId: this.trackId })
+  }
 
   /** Where this run has got to, which is what an admin is shown. */
   progress = (): PlaybackProgress =>
-    this.running
+    this.isRunning()
       ? {
           playing: true,
           trackId: this.trackId,
@@ -84,10 +97,13 @@ export class PlaybackSession {
    * `audienceNow` is read once per chunk, so a device that connects or leaves
    * mid-track is picked up on the next one.
    *
+   * `log` is where the run records its start and how it ended, each after the
+   * devices have been told. It is held only while the run goes on.
+   *
    * More or less accurate timer taken from https://stackoverflow.com/a/29972322/16725862
    */
-  start = (startTime: number, audienceNow: () => Recipient[]) => {
-    if (this.running) {
+  start = (startTime: number, audienceNow: () => Recipient[], log: PerformanceLog) => {
+    if (this.isRunning()) {
       return false
     }
 
@@ -97,8 +113,6 @@ export class PlaybackSession {
         device.send(JSON.stringify(message))
       }
     }
-
-    this.running = true
 
     announce({ start: true })
 
@@ -115,6 +129,9 @@ export class PlaybackSession {
     // nonChoir mode: which device held which partial last chunk, so a partial
     // stays with the same device for as long as that device is connected.
     let partialMap: PartialMap = {}
+
+    /** How many times the track began again since the last chunk went out, to be recorded once it has. */
+    let rounds = 0
 
     /**
      * Sends the current chunk. It runs from a timer, where nothing above catches
@@ -136,21 +153,12 @@ export class PlaybackSession {
 
         partialMap = nextMap
       } catch (err) {
-        logger.error(
-          `Performing ${this.performanceKey}: skipped chunk ${chunkIndex}, which could not be sent: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        )
+        logger.error(`Performing ${this.performanceKey}: skipped chunk ${chunkIndex}, which could not be sent: ${reasonOf(err)}`)
       }
     }
 
     const step = () => {
       logger.info(`Performing ${this.performanceKey} @ chunk ${chunkIndex}`)
-      if (!this.running) {
-        logger.info('Sending interval stopped.')
-        reset()
-        return
-      }
 
       const behindMs = Date.now() - expected
       const skipped = skipChunksAlreadyOver()
@@ -171,11 +179,13 @@ export class PlaybackSession {
         logger.info('No clients to distribute to.')
       }
 
+      for (; rounds > 0; rounds--) log.write({ type: 'loop', trackId: this.trackId })
+
       this.sentChunk = chunkIndex
       chunkIndex++
 
       expected += CHUNK_INTERVAL_MS
-      setTimeout(step, Math.max(0, CHUNK_INTERVAL_MS - dt))
+      nextStep = setTimeout(step, Math.max(0, CHUNK_INTERVAL_MS - dt))
     }
 
     /** The date every chunk of the current round is sent with. */
@@ -187,9 +197,10 @@ export class PlaybackSession {
     const wrapIntoRound = () => {
       const length = this.frames.length
       if (!this.loop || !length || !atEnd()) return
-      const rounds = Math.floor(chunkIndex / length)
-      actualStartTime += rounds * length
-      chunkIndex -= rounds * length
+      const passed = Math.floor(chunkIndex / length)
+      actualStartTime += passed * length
+      chunkIndex -= passed * length
+      rounds += passed
     }
 
     /**
@@ -208,16 +219,23 @@ export class PlaybackSession {
       return skipped
     }
 
-    // Start
-    setTimeout(step, CHUNK_INTERVAL_MS)
+    /** The next step, while one is due. */
+    let nextStep: NodeJS.Timeout | undefined
 
-    const reset = () => {
+    this.finish = (record) => {
+      this.finish = undefined
+      clearTimeout(nextStep)
       partialMap = {}
       chunkIndex = 0
 
       // Notify all clients of track end
       announce({ stop: true })
+      log.write(record)
     }
+
+    // Start
+    nextStep = setTimeout(step, CHUNK_INTERVAL_MS)
+    log.write({ type: 'start', trackId: this.trackId, loop: this.loop, startAtChunk: this.startAtChunk })
 
     const handleTrackEnd = () => {
       if (chunkIndex >= this.frames.length) {
@@ -227,8 +245,7 @@ export class PlaybackSession {
           return true
         } else {
           logger.info('No more chunks. Stopping.')
-          this.running = false
-          reset()
+          this.finish?.({ type: 'ended', trackId: this.trackId })
           return false
         }
       }

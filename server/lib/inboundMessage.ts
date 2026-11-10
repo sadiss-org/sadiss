@@ -73,8 +73,15 @@ const readers = new Map<string, (frame: Frame) => InboundMessage | undefined>([
   ['isAdmin', readAdminRegistration]
 ])
 
-/** One of our messages, or nothing at all. Nothing is returned rather than thrown. */
-export const readInboundMessage = (raw: string): InboundMessage | undefined => {
+/**
+ * One of our messages, or nothing at all. Nothing is returned rather than thrown.
+ * `onMalformed` hears the type of a message we accept that arrived in a shape we
+ * cannot read.
+ */
+export const readInboundMessage = (
+  raw: string,
+  onMalformed: (message: string) => void = () => undefined
+): InboundMessage | undefined => {
   let parsed: unknown
 
   try {
@@ -98,6 +105,7 @@ export const readInboundMessage = (raw: string): InboundMessage | undefined => {
   const message = read(parsed)
   if (!message) {
     logger.warn(`Discarded a malformed ${parsed.message} message: ${raw.slice(0, 200)}`)
+    onMalformed(parsed.message as string)
   }
 
   return message
