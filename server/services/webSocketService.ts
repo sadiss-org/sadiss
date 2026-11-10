@@ -6,6 +6,7 @@ import { ClientInfoMessage, CURRENT_PROTOCOL_VERSION, readProtocolVersion } from
 import { measurementService } from './measurement'
 import { performanceLogFiles } from './performanceLogFiles'
 import { createConnectionLog } from './connectionLog'
+import { startHealthSampler } from '../lib/serverHealth'
 import { v4 as uuidv4 } from 'uuid'
 import { SadissWebSocketServer, SadissWebSocket } from '../lib/SadissWebsocket'
 import { AdminRegistrationMessage, readInboundMessage } from '../lib/inboundMessage'
@@ -28,6 +29,9 @@ import {
  */
 const ADMIN_INFO_INTERVAL_MS = 1000
 
+/** How often the server's health is sampled into the server-wide log. */
+const HEALTH_EVERY_MS = 5000
+
 interface HeartbeatOptions {
   /** How often the connections are looked at. */
   tickMs: number
@@ -40,6 +44,8 @@ interface WebSocketServerOptions {
   heartbeat?: HeartbeatOptions
   /** How often each admin is told the state of the room. */
   adminInfoIntervalMs?: number
+  /** How often the server's health is written to the server-wide log. */
+  healthEveryMs?: number
 }
 
 /**
@@ -52,6 +58,12 @@ export const startWebSocketServer = (port = 0, options: WebSocketServerOptions =
 
   watchConnections(wss, options.heartbeat)
   startAdminInfoUpdates(wss, options.adminInfoIntervalMs ?? ADMIN_INFO_INTERVAL_MS)
+  const stopHealthSampler = startHealthSampler({
+    everyMs: options.healthEveryMs ?? HEALTH_EVERY_MS,
+    sockets: () => wss.clients.size,
+    write: (record) => performanceLogFiles.server.write(record)
+  })
+  wss.on('close', stopHealthSampler)
 
   wss.on('connection', (client, request) => {
     request.socket.setKeepAlive(true, 60000) // Might help with idle connections. Main mechanism is the heartbeat.

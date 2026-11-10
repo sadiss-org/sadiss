@@ -80,8 +80,13 @@ const waitFor = async <T>(what: string, read: () => T | undefined, timeoutMs = 1
   throw new Error(`Timed out after ${timeoutMs}ms waiting for ${what}`)
 }
 
-/** The records in a log file so far: a performance's, or the server-wide one. */
-const recordsOf = (performanceId: string | 'server'): any[] => {
+/**
+ * The records in a log file so far: a performance's, or the server-wide one.
+ * Left out are the records written on a clock rather than by what a test does:
+ * health samples (serverHealth.spec.ts) and chunk records (chunkRecords.spec.ts),
+ * unless `withTimed` asks for them.
+ */
+const recordsOf = (performanceId: string | 'server', withTimed = false): any[] => {
   const file = path.join(dir, performanceId === 'server' ? 'server.jsonl' : `performance-${performanceId}.jsonl`)
   if (!fs.existsSync(file)) return []
   return fs
@@ -89,6 +94,7 @@ const recordsOf = (performanceId: string | 'server'): any[] => {
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line))
+    .filter((record) => withTimed || (record.type !== 'health' && record.type !== 'chunk'))
 }
 
 const waitForRecords = (performanceId: string | 'server', count: number) =>
@@ -145,6 +151,17 @@ describe('the performance log file', () => {
     for (let i = 1; i < records.length; i++) {
       expect(records[i].t).toBeGreaterThanOrEqual(records[i - 1].t)
     }
+
+    // One chunk record for each chunk of the track, between its start and its end. In choir mode a
+    // device is sent a chunk only when it holds a partial or phrase for its voice.
+    const all = recordsOf(performanceId, true)
+    const types = all.map((record) => record.type)
+    const chunks = all.filter((record) => record.type === 'chunk')
+    expect(chunks.map((record) => record.index)).toEqual([...Array(track.trackLengthInChunks).keys()])
+    expect(chunks.every((record) => record.devices <= 2)).toBe(true)
+    expect(chunks.some((record) => record.devices > 0)).toBe(true)
+    expect(types.indexOf('chunk')).toBeGreaterThan(types.indexOf('start'))
+    expect(types.lastIndexOf('chunk')).toBeLessThan(types.indexOf('ended'))
 
     // Each connection opened before it registered, recorded in the server-wide file.
     const connects = recordsOf('server').filter((record) => record.type === 'connect')
