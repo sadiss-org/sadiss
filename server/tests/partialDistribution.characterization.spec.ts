@@ -19,7 +19,7 @@
 import { Types } from 'mongoose'
 import { createMockWsClient } from './testUtils'
 import { PlaybackSession } from '../playbackSession'
-import { PerformanceLog } from '../lib/performanceLog'
+import { PerformanceLog } from '../lib/logRecords'
 import { webSocketAudience } from '../lib/audience'
 import { Frame, PartialChunk, TrackMode, TtsInstructions } from '../types'
 

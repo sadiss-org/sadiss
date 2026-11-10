@@ -1,7 +1,7 @@
 import { Writable } from 'stream'
 import { describe, expect, it, vi } from 'vitest'
 import { createRecordLog } from '../lib/recordLog'
-import { PerformanceRecord } from '../lib/performanceLog'
+import { PerformanceRecord } from '../lib/logRecords'
 import { logger } from '../tools'
 import { failsOnWrite, Keeps, logTo, NeverDrains } from './logStreams'
 

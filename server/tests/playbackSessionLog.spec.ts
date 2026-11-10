@@ -97,6 +97,19 @@ describe('what a playback session records', () => {
     expect(records().map((record) => record.type)).toEqual(['start', 'loop', 'loop', 'stop'])
   })
 
+  it('each time a looping track began again, also when sending fell behind by several rounds at once', () => {
+    const { session, records } = play(true)
+
+    vi.advanceTimersByTime(1500)
+    // A blocked event loop: the clock moves on by three rounds of the track, and no timer runs in between.
+    vi.setSystemTime(Date.now() + 6000)
+    vi.advanceTimersByTime(1000)
+    session.stop()
+
+    // The track starts at 100 s and lasts 2 s; the step after the stall runs 7.5 s in, so it began again at 2, 4 and 6 s.
+    expect(records().map((record) => record.type)).toEqual(['start', 'loop', 'loop', 'loop', 'stop'])
+  })
+
   it('a stop only once the devices have been told, as it does a start and an end', () => {
     const timeline: string[] = []
     const phone = {

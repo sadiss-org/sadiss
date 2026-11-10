@@ -419,6 +419,22 @@ describe('the performance log file', () => {
     }
   )
 
+  it(
+    'opens no file for a performance id spelled other than an ObjectId prints, even one Mongo would match',
+    { timeout: 10000 },
+    async () => {
+      const performanceId = (await createTestPerformance()).toString()
+      const device = await openDevice(global.testWss)
+
+      await register(device, performanceId.toUpperCase(), 0)
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      device.ws.close()
+
+      await waitForRecords('server', 2)
+      expect(fs.readdirSync(dir)).toEqual(['server.jsonl'])
+    }
+  )
+
   it('looks a performance up once for a device that sends the same clientInfo again', { timeout: 10000 }, async () => {
     const performanceId = (await createTestPerformance()).toString()
     const lookups = vi.spyOn(SadissPerformance, 'exists')

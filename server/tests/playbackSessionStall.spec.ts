@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PlaybackSession } from '../playbackSession'
-import { PerformanceLog } from '../lib/performanceLog'
+import { PerformanceLog } from '../lib/logRecords'
 import { Recipient } from '../lib/audience'
 import { Frame, PartialChunk, TrackSettings } from '../types'
 import { logger } from '../tools'

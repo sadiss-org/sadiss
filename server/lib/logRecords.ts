@@ -60,7 +60,8 @@ export type ConnectionRecord =
   /**
    * The socket sent one of the messages the server accepts, named in `message`,
    * in a shape it cannot read, so the message was ignored. A clientInfo ignored
-   * this way leaves the device unregistered.
+   * this way leaves the device as it was: unregistered if it had not registered,
+   * in its earlier performance if it had.
    */
   | { type: 'malformedMessage'; connection: string; message: string }
   /** The socket closed: by the device or the network, or because the heartbeat gave up on it. */

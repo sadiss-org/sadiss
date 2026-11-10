@@ -11,7 +11,6 @@ import { SadissWebSocketServer, SadissWebSocket } from '../lib/SadissWebsocket'
 import { AdminRegistrationMessage, readInboundMessage } from '../lib/inboundMessage'
 import { authenticatedUserId } from '../lib/adminAuth'
 import { SadissPerformance, visibleTo } from '../models/sadissPerformance'
-import { isValidObjectId } from 'mongoose'
 import {
   DEFAULT_TICK_MS,
   LIMITS_FOR_A_QUIET_PEER,
@@ -91,7 +90,7 @@ const handleMessage = (wss: SadissWebSocketServer, client: SadissWebSocket) => (
 
   try {
     const parsed = readInboundMessage(event.data.toString(), (message) =>
-      connectionLog.write(client, { type: 'malformedMessage', connection: client.id, message })
+      connectionLog.write(client, { type: 'malformedMessage', message })
     )
     if (!parsed) {
       return
@@ -117,7 +116,7 @@ const handleMessage = (wss: SadissWebSocketServer, client: SadissWebSocket) => (
 }
 
 const logHandlingFailure = (client: SadissWebSocket, err: unknown) => {
-  logger.error(`Dropped a message from ${client.id} whose handling failed: ${err instanceof Error ? err.message : String(err)}`)
+  logger.error(`Dropped a message from ${client.id} whose handling failed: ${reasonOf(err)}`)
 }
 
 const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) => {
@@ -134,8 +133,11 @@ const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) 
   // Tell the device how often to run the clock-sync round trip.
   client.send(JSON.stringify(measurementService.buildConfigMessage()))
 
-  connectionLog.identified(client).catch((err: unknown) => logHandlingFailure(client, err))
+  connectionLog.identified(client)
 }
+
+/** How a performance id is written: the one spelling an ObjectId prints as. */
+const OBJECT_ID = /^[0-9a-f]{24}$/
 
 /**
  * Whether a performance with this id matching `filter` exists, or undefined
@@ -143,7 +145,8 @@ const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) 
  * message for a failed lookup.
  */
 const findPerformance = async (performanceId: string, filter: object, what: string) => {
-  if (!isValidObjectId(performanceId)) return false
+  // Mongo also matches other spellings of the same id, which would each name a file of their own.
+  if (!OBJECT_ID.test(performanceId)) return false
 
   try {
     return !!(await SadissPerformance.exists({ _id: performanceId, ...filter }))
@@ -189,7 +192,7 @@ const registerAdmin = async (
   }
 
   client.isAdmin = true
-  connectionLog.identified(client).catch((err: unknown) => logHandlingFailure(client, err))
+  connectionLog.identified(client)
 
   if (registration.performanceId) {
     client.performanceId = registration.performanceId
@@ -202,7 +205,7 @@ const registerAdmin = async (
 const handleClose = (client: SadissWebSocket) => (event: WebSocket.CloseEvent) => {
   logger.info(`Client has disconnected! id: ${client.id}`)
 
-  connectionLog.write(client, { type: 'disconnect', connection: client.id, reason: client.closeReason, code: event.code })
+  connectionLog.write(client, { type: 'disconnect', reason: client.closeReason, code: event.code })
 }
 
 const handlePong = (client: SadissWebSocket) => () => {

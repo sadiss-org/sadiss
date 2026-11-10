@@ -1,6 +1,6 @@
 import { Writable } from 'stream'
 import { createRecordLog } from '../lib/recordLog'
-import { PerformanceRecord } from '../lib/performanceLog'
+import { PerformanceRecord } from '../lib/logRecords'
 
 /** Streams for testing a record log: one that never drains, one that keeps everything, one whose disk fails. */
 

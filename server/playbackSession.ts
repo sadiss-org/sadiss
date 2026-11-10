@@ -1,11 +1,11 @@
 import { Frame, TrackSettings } from './types'
 import { Types } from 'mongoose'
-import { logger } from './tools'
+import { logger, reasonOf } from './tools'
 import { Recipient } from './lib/audience'
 import { PartialMap } from './partialDistribution'
 import { payloadsForChunk } from './chunkPayloads'
 import { CHUNK_SECONDS } from './types/ChunkEnvelope'
-import { PerformanceLog } from './lib/performanceLog'
+import { PerformanceLog } from './lib/logRecords'
 
 const CHUNK_INTERVAL_MS = CHUNK_SECONDS * 1000
 
@@ -130,8 +130,8 @@ export class PlaybackSession {
     // stays with the same device for as long as that device is connected.
     let partialMap: PartialMap = {}
 
-    /** Whether the track began again since the last chunk went out, to be recorded once it has. */
-    let looped = false
+    /** How many times the track began again since the last chunk went out, to be recorded once it has. */
+    let rounds = 0
 
     /**
      * Sends the current chunk. It runs from a timer, where nothing above catches
@@ -153,11 +153,7 @@ export class PlaybackSession {
 
         partialMap = nextMap
       } catch (err) {
-        logger.error(
-          `Performing ${this.performanceKey}: skipped chunk ${chunkIndex}, which could not be sent: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        )
+        logger.error(`Performing ${this.performanceKey}: skipped chunk ${chunkIndex}, which could not be sent: ${reasonOf(err)}`)
       }
     }
 
@@ -183,10 +179,7 @@ export class PlaybackSession {
         logger.info('No clients to distribute to.')
       }
 
-      if (looped) {
-        looped = false
-        log.write({ type: 'loop', trackId: this.trackId })
-      }
+      for (; rounds > 0; rounds--) log.write({ type: 'loop', trackId: this.trackId })
 
       this.sentChunk = chunkIndex
       chunkIndex++
@@ -204,10 +197,10 @@ export class PlaybackSession {
     const wrapIntoRound = () => {
       const length = this.frames.length
       if (!this.loop || !length || !atEnd()) return
-      const rounds = Math.floor(chunkIndex / length)
-      actualStartTime += rounds * length
-      chunkIndex -= rounds * length
-      looped = true
+      const passed = Math.floor(chunkIndex / length)
+      actualStartTime += passed * length
+      chunkIndex -= passed * length
+      rounds += passed
     }
 
     /**

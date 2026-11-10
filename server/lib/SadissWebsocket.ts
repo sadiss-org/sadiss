@@ -1,7 +1,7 @@
 import { Server, WebSocketServer, ServerOptions, WebSocket } from 'ws'
 import { logger } from '../tools'
 import { UNVERSIONED_PROTOCOL_VERSION } from '../types'
-import { CloseReason } from './performanceLog'
+import { CloseReason } from './logRecords'
 
 export class SadissWebSocket extends WebSocket {
   id = ''

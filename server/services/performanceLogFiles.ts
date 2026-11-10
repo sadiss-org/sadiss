@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { PerformanceLog, PerformanceRecord, ServerLog, ServerRecord } from '../lib/performanceLog'
+import { PerformanceLog, PerformanceRecord, ServerLog, ServerRecord } from '../lib/logRecords'
 import { createRecordLog } from '../lib/recordLog'
 import { logger, reasonOf } from '../tools'
 
@@ -8,7 +8,7 @@ import { logger, reasonOf } from '../tools'
  * The application-wide log files, in the directory `PERFORMANCE_LOG_DIR` names:
  * `performance-<id>.jsonl` for each performance, and `server.jsonl` for what
  * happens to a connection while it belongs to none. Nothing is written when it
- * is unset. The directory can be changed at runtime with
+ * is unset. Tests point it at a directory of their own with
  * `performanceLogFiles.writeTo(...)`.
  *
  * A file is opened by its first record and closed after ten minutes without one,
