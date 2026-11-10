@@ -116,25 +116,32 @@ export class PlaybackSession {
     // stays with the same device for as long as that device is connected.
     let partialMap: PartialMap = {}
 
+    /**
+     * Sends the current chunk. It runs from a timer, where nothing above catches
+     * what it throws, so a chunk that cannot be sent is logged and costs only
+     * itself: the next one is sent on time.
+     */
     const sendChunk = (devices: Recipient[]) => {
       const currentFrame = this.frames[chunkIndex]
       if (!currentFrame) {
         return
       }
 
-      const { messages, nextMap } = payloadsForChunk(
-        currentFrame,
-        devices,
-        chunkDate(),
-        this.settings,
-        partialMap
-      )
+      try {
+        const { messages, nextMap } = payloadsForChunk(currentFrame, devices, chunkDate(), this.settings, partialMap)
 
-      for (const { device, json } of messages) {
-        device.send(json)
+        for (const { device, json } of messages) {
+          device.send(json)
+        }
+
+        partialMap = nextMap
+      } catch (err) {
+        logger.error(
+          `Performing ${this.performanceKey}: skipped chunk ${chunkIndex}, which could not be sent: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        )
       }
-
-      partialMap = nextMap
     }
 
     const step = () => {
