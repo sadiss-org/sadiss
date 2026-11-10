@@ -7,6 +7,9 @@ export interface Clock {
 
 export const systemClock: Clock = { now: () => Date.now() }
 
+/** The first protocol version whose builds send a report with their pings. */
+export const PROTOCOL_VERSION_WITH_REPORTS = 3
+
 /** The connection fields the service needs — satisfied by SadissWebSocket. */
 export interface MeasurementClient {
   id: string
@@ -25,8 +28,8 @@ export interface MeasurementServiceDeps {
 export interface MeasurementService {
   /** Answer a client's `measure` ping, stamping it with the server clock. */
   handleMeasure(client: MeasurementClient, message: MeasureMessage): void
-  /** The active config wrapped as a server→client message. */
-  buildConfigMessage(): MeasureConfigMessage
+  /** The active config wrapped as a server→client message, for a device speaking `protocolVersion`. */
+  buildConfigMessage(protocolVersion: number): MeasureConfigMessage
   /** How often devices are currently told to report. */
   reportingIntervalMs(): number
   /** Replace the active config at runtime (tunable without an app rebuild). */
@@ -58,9 +61,11 @@ export const createMeasurementService = ({
       client.send(JSON.stringify(response))
     },
 
-    buildConfigMessage() {
-      // Left out rather than false while none is wanted, so the message is the one older servers sent.
-      return { message: 'measureConfig', config: reportsWanted() ? { ...activeConfig, report: true } : activeConfig }
+    buildConfigMessage(protocolVersion) {
+      // Left out rather than false while none is wanted, and for builds that have no report to send,
+      // so they get the message older servers sent.
+      const askForReport = protocolVersion >= PROTOCOL_VERSION_WITH_REPORTS && reportsWanted()
+      return { message: 'measureConfig', config: askForReport ? { ...activeConfig, report: true } : activeConfig }
     },
 
     reportingIntervalMs() {

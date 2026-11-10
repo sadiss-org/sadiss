@@ -4,6 +4,7 @@ import { PlaybackProgress } from '../playbackSession'
 import { logger, reasonOf } from '../tools'
 import { ClientInfoMessage, CURRENT_PROTOCOL_VERSION, readProtocolVersion } from '../types'
 import { measurementService } from './measurement'
+import { PROTOCOL_VERSION_WITH_REPORTS } from './measurementService'
 import { performanceLogFiles } from './performanceLogFiles'
 import { createConnectionLog } from './connectionLog'
 import { v4 as uuidv4 } from 'uuid'
@@ -106,7 +107,11 @@ const handleMessage = (wss: SadissWebSocketServer, client: SadissWebSocket) => (
         client.reportsRegularly = true
         measurementService.handleMeasure(client, parsed)
         // After the answer, so the round trip never waits on the log.
-        if (parsed.report) connectionLog.write(client, { type: 'phone', deviceId: client.device?.id ?? null, ...parsed.report })
+        // Only from a phone that said in its handshake that it speaks a version that reports, so a
+        // socket that never introduced itself cannot fill the log.
+        if (parsed.report && client.protocolVersion >= PROTOCOL_VERSION_WITH_REPORTS) {
+          connectionLog.write(client, { type: 'phone', deviceId: client.device?.id ?? null, ...parsed.report })
+        }
         break
       case 'isAdmin':
         registerAdmin(wss, client, parsed).catch((err: unknown) => logHandlingFailure(client, err))
@@ -134,7 +139,7 @@ const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) 
 
   client.send('clientInfoReceived')
   // Tell the device how often to run the clock-sync round trip.
-  client.send(JSON.stringify(measurementService.buildConfigMessage()))
+  client.send(JSON.stringify(measurementService.buildConfigMessage(client.protocolVersion)))
 
   connectionLog.identified(client)
 }

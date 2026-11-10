@@ -473,45 +473,75 @@ describe('the performance log file', () => {
     await waitForRecords(performanceId, 4)
   })
 
-  it(
-    "asks devices for reports while it logs, answers each ping first, and records each report in the device's file",
-    { timeout: 10000 },
-    async () => {
-      const performanceId = (await createTestPerformance()).toString()
-      const device = await openDevice(global.testWss)
-      const deviceId = '1f0e6c3a-6a5b-4c1e-9d55-3c1f2b7a9e10'
-      device.ws.send(
-        JSON.stringify({
-          message: 'clientInfo',
-          clientId: 0,
-          ttsLang,
-          performanceId,
-          protocolVersion: CURRENT_PROTOCOL_VERSION,
-          device: {
-            id: deviceId,
-            appVersion: '2.2.0',
-            appBuild: '12',
-            platform: 'android',
-            osVersion: '13',
-            model: 'MAR-LX1A',
-            network: 'wifi'
-          }
-        })
-      )
-      await waitForRecords(performanceId, 1)
-      const report = { clock: null, audio: null, visible: true, keepAlivePlaying: true, lastChunk: { index: 2, leadMs: 850 } }
+  it('records no report from a socket that never said which device it is', { timeout: 10000 }, async () => {
+    const device = await openDevice(global.testWss)
+    const report = { clock: null, audio: null, visible: true, keepAlivePlaying: true, lastChunk: null }
 
-      device.ws.send(JSON.stringify({ message: 'measure', t0: 42, report }))
+    device.ws.send(JSON.stringify({ message: 'measure', t0: 42, report }))
+    await waitFor('the answer', () => device.frames.find((frame) => frame.includes('measureResponse')))
+    device.ws.close()
 
-      const config = await waitFor('the clock-sync config', () => device.frames.find((frame) => frame.includes('measureConfig')))
-      expect(JSON.parse(config).config).toMatchObject({ report: true })
-      await waitFor('the answer', () => device.frames.find((frame) => frame.includes('measureResponse')))
-      const records = await waitForRecords(performanceId, 2)
-      expect(records[1]).toEqual({ t: expect.any(Number), type: 'phone', connection: records[0].connection, deviceId, ...report })
-      device.ws.close()
-      await waitForRecords(performanceId, 3)
-    }
-  )
+    const records = await waitForRecords('server', 2)
+    expect(records.map((record) => record.type)).toEqual(['connect', 'disconnect'])
+  })
+
+  it('answers a ping whose report cannot be logged', { timeout: 10000 }, async () => {
+    const performanceId = (await createTestPerformance()).toString()
+    const device = await openDevice(global.testWss)
+    await register(device, performanceId, 0)
+    await waitForRecords(performanceId, 1)
+    const files = performanceLogFiles.for.bind(performanceLogFiles)
+    vi.spyOn(performanceLogFiles, 'for').mockImplementation((id) => ({
+      write: (record) => {
+        if (record.type === 'phone') throw new Error('disk on fire')
+        files(id).write(record)
+      }
+    }))
+    const report = { clock: null, audio: null, visible: true, keepAlivePlaying: true, lastChunk: null }
+
+    device.ws.send(JSON.stringify({ message: 'measure', t0: 42, report }))
+
+    const answer = await waitFor('the answer', () => device.frames.find((frame) => frame.includes('measureResponse')))
+    expect(JSON.parse(answer)).toMatchObject({ t0: 42 })
+    device.ws.close()
+    await waitForRecords(performanceId, 2)
+  })
+
+  it("asks devices for reports while it logs, and records each report in the device's file", { timeout: 10000 }, async () => {
+    const performanceId = (await createTestPerformance()).toString()
+    const device = await openDevice(global.testWss)
+    const deviceId = '1f0e6c3a-6a5b-4c1e-9d55-3c1f2b7a9e10'
+    device.ws.send(
+      JSON.stringify({
+        message: 'clientInfo',
+        clientId: 0,
+        ttsLang,
+        performanceId,
+        protocolVersion: CURRENT_PROTOCOL_VERSION,
+        device: {
+          id: deviceId,
+          appVersion: '2.2.0',
+          appBuild: '12',
+          platform: 'android',
+          osVersion: '13',
+          model: 'MAR-LX1A',
+          network: 'wifi'
+        }
+      })
+    )
+    await waitForRecords(performanceId, 1)
+    const report = { clock: null, audio: null, visible: true, keepAlivePlaying: true, lastChunk: { index: 2, leadMs: 850 } }
+
+    device.ws.send(JSON.stringify({ message: 'measure', t0: 42, report }))
+
+    const config = await waitFor('the clock-sync config', () => device.frames.find((frame) => frame.includes('measureConfig')))
+    expect(JSON.parse(config).config).toMatchObject({ report: true })
+    await waitFor('the answer', () => device.frames.find((frame) => frame.includes('measureResponse')))
+    const records = await waitForRecords(performanceId, 2)
+    expect(records[1]).toEqual({ t: expect.any(Number), type: 'phone', connection: records[0].connection, deviceId, ...report })
+    device.ws.close()
+    await waitForRecords(performanceId, 3)
+  })
 
   it('looks a performance up once for a device that sends the same clientInfo again', { timeout: 10000 }, async () => {
     const performanceId = (await createTestPerformance()).toString()

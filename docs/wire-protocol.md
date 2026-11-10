@@ -115,16 +115,16 @@ malformed identity never costs a phone its place in the performance.
 
 ## What a phone reports with each ping (version 3)
 
-While the server keeps a performance log, `measureConfig` says so with
-`report: true`:
+While the server keeps a performance log, `measureConfig` asks a phone that
+speaks version 3 or later for reports with `report: true`:
 
 ```json
 { "message": "measureConfig", "config": { "intervalMs": 3000, "report": true } }
 ```
 
-Without a log, or with `PHONE_REPORTS=off` in the server's environment, the
-field is left out, so the message is the one earlier servers sent; a phone
-treats a config without it as no. While it is true, each `measure` carries the
+Without a log, with `PHONE_REPORTS=off` in the server's environment, or for a
+build of version 1 or 2, the field is left out, so the message is the one
+earlier servers sent; a phone treats a config without it as no. While it is true, each `measure` carries the
 phone's state:
 
 ```json
@@ -139,8 +139,8 @@ phone's state:
 ```
 
 - `clock`: the phone's estimate of server time minus its own clock, the median
-  round trip of the round trips that estimate uses, how many round trips it
-  holds, and how long the connection has been open.
+  round trip of the faster half of its round trips, which the estimate uses, how
+  many round trips its window holds, and how long the connection has been open.
 - `audio`: how playback is scheduled: server time minus audio-clock time, the
   output latency set on the calibration page, and what the audio context says
   about its state, latencies, sample rate and output timestamp.
@@ -150,7 +150,8 @@ phone's state:
   before its first sound it arrived by the phone's clock.
 
 A figure the phone cannot give is null. The server answers the ping first and
-then writes the report as a `phone` record, with the device id from the
+then, if the socket's handshake said version 3 or later, writes the report as a
+`phone` record, with the device id from the
 handshake, to the file the connection's records go to. A figure of the wrong
 kind is logged as null, and a `report` that is not an object is ignored: the
 ping is the shared clock and is always answered.

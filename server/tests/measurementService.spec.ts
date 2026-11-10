@@ -47,7 +47,7 @@ describe('measurementService', () => {
     it('exposes the active config as a pushable message', () => {
       const service = createMeasurementService({ clock: fakeClock([0]), config: defaultConfig })
 
-      expect(service.buildConfigMessage()).toEqual({ message: 'measureConfig', config: defaultConfig })
+      expect(service.buildConfigMessage(3)).toEqual({ message: 'measureConfig', config: defaultConfig })
     })
 
     it('can be reconfigured at runtime without rebuilding the service', () => {
@@ -55,7 +55,7 @@ describe('measurementService', () => {
 
       service.setConfig({ intervalMs: 5000 })
 
-      expect(service.buildConfigMessage()).toEqual({
+      expect(service.buildConfigMessage(3)).toEqual({
         message: 'measureConfig',
         config: { intervalMs: 5000 }
       })
@@ -64,13 +64,19 @@ describe('measurementService', () => {
     it('asks devices for a report on their state with each ping while reports are wanted', () => {
       const service = createMeasurementService({ clock: fakeClock([0]), config: defaultConfig, reportsWanted: () => true })
 
-      expect(service.buildConfigMessage()).toEqual({ message: 'measureConfig', config: { intervalMs: 3000, report: true } })
+      expect(service.buildConfigMessage(3)).toEqual({ message: 'measureConfig', config: { intervalMs: 3000, report: true } })
+    })
+
+    it.each([1, 2])('never asks a device speaking protocol v%i, which has no report to send', (version) => {
+      const service = createMeasurementService({ clock: fakeClock([0]), config: defaultConfig, reportsWanted: () => true })
+
+      expect(service.buildConfigMessage(version)).toEqual({ message: 'measureConfig', config: { intervalMs: 3000 } })
     })
 
     it('leaves the report out of the config while none is wanted, so the message is what older servers sent', () => {
       const service = createMeasurementService({ clock: fakeClock([0]), config: defaultConfig, reportsWanted: () => false })
 
-      expect(JSON.stringify(service.buildConfigMessage())).toBe('{"message":"measureConfig","config":{"intervalMs":3000}}')
+      expect(JSON.stringify(service.buildConfigMessage(3))).toBe('{"message":"measureConfig","config":{"intervalMs":3000}}')
     })
   })
 })

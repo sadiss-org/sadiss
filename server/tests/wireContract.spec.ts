@@ -1,8 +1,12 @@
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import WebSocket from 'ws'
 import { Types } from 'mongoose'
 import { describe, expect, it } from 'vitest'
 import { agent } from './setupTests'
 import { createTestPerformance, createTestTrack } from './testUtils'
+import { performanceLogFiles } from '../services/performanceLogFiles'
 import { SUPPORTED_PROTOCOL_VERSIONS, TrackDocument, UNVERSIONED_PROTOCOL_VERSION } from '../types'
 
 /**
@@ -84,6 +88,29 @@ for (const version of SUPPORTED_PROTOCOL_VERSIONS) {
       }
     })
 
+    it(
+      'is asked to report on its state with each ping while the server logs only if it speaks a version that can',
+      { timeout: 20000 },
+      async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wire-log-'))
+        performanceLogFiles.writeTo(dir)
+        const { ws, frames } = await openDevice()
+
+        try {
+          ws.send(JSON.stringify(handshakeFor(version, new Types.ObjectId().toString())))
+          await waitFor('the handshake reply', () => frames.length >= 2 || undefined)
+
+          expect(JSON.parse(frames[1]).config).toEqual(
+            version >= 3 ? { intervalMs: expect.any(Number), report: true } : { intervalMs: expect.any(Number) }
+          )
+        } finally {
+          ws.close()
+          performanceLogFiles.writeTo(null)
+          fs.rmSync(dir, { recursive: true, force: true })
+        }
+      }
+    )
+
     it('gets its clock-sync ping stamped and echoed back', { timeout: 20000 }, async () => {
       const { ws, frames } = await openDevice()
 
@@ -111,7 +138,10 @@ for (const version of SUPPORTED_PROTOCOL_VERSIONS) {
     it('is announced to, sent its audio, and told when the track ends', { timeout: 30000 }, async () => {
       const track: TrackDocument = await createTestTrack('partials')
       const performanceId = await createTestPerformance()
-      await agent.post('/api/add-tracks-to-performance').send({ trackIds: [track._id], performanceId }).expect(201)
+      await agent
+        .post('/api/add-tracks-to-performance')
+        .send({ trackIds: [track._id], performanceId })
+        .expect(201)
 
       const { ws, frames } = await openDevice()
 
@@ -140,18 +170,14 @@ for (const version of SUPPORTED_PROTOCOL_VERSIONS) {
             index: 0,
             startTime: expect.any(Number),
             endTime: expect.any(Number),
-            breakpoints: expect.arrayContaining([
-              { time: expect.any(Number), freq: expect.any(Number), amp: expect.any(Number) }
-            ])
+            breakpoints: expect.arrayContaining([{ time: expect.any(Number), freq: expect.any(Number), amp: expect.any(Number) }])
           }
         ])
 
         await agent.post('/api/track/stop').send({ performanceId }).expect(200)
 
         // Without this a device plays on with whatever it last scheduled.
-        const stopped = await waitFor('the stop announcement', () =>
-          messages(frames).find((message) => message.stop)
-        )
+        const stopped = await waitFor('the stop announcement', () => messages(frames).find((message) => message.stop))
         expect(stopped).toEqual({ stop: true })
       } finally {
         await agent.post('/api/track/stop').send({ performanceId })
