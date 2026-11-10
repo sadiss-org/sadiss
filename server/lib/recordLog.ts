@@ -51,7 +51,11 @@ export const createRecordLog = <R extends { type: string }>(
   now: () => number,
   prepareRetry: () => Promise<void> = () => Promise.resolve()
 ): RecordLog<R> & {
-  /** Ends the stream, after writing how many lines were lost. Records written afterwards are ignored. */
+  /**
+   * Ends the stream, after writing how many lines were lost when a stream is
+   * open. A log closed while it waits to try a failed file again has none, and
+   * that count is not written. Records written afterwards are ignored.
+   */
   close(): void
   /**
    * How many lines are not yet known to be in the file: lost and not yet
