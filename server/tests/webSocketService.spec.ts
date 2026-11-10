@@ -2,6 +2,8 @@ import WebSocket from 'ws'
 import { Types } from 'mongoose'
 import { measurementService } from '../services/measurement'
 import { logger } from '../tools'
+import { authCookie } from './setupTests'
+import { createTestPerformance } from './testUtils'
 
 /** Opens a raw client socket to the test WS server. */
 const connect = () =>
@@ -107,6 +109,71 @@ describe('webSocketService with a message whose handling fails', () => {
     expect(errors).toHaveBeenCalledWith(expect.stringContaining('handler blew up'))
     failing.mockRestore()
     noisy.close()
+    other.close()
+  })
+})
+
+/**
+ * ws rejects some frames before any message handler sees them, and reports it
+ * as an error on the socket. Each case is checked by having a second client get
+ * an answer afterwards.
+ */
+describe('webSocketService with frames ws cannot read', () => {
+  it('keeps serving other clients after a text frame that is not valid UTF-8', async () => {
+    const noisy = await connect()
+    noisy.on('error', () => undefined)
+    const closed = new Promise<number>((resolve) => noisy.on('close', resolve))
+    const other = await connect()
+    const response = waitForMessage(other, 'measureResponse')
+
+    // ws sends these bytes as a text frame without checking them.
+    noisy.send(Buffer.from([0xff]), { binary: false })
+    expect(await closed).toBe(1007)
+    other.send(JSON.stringify({ message: 'measure', t0: 4444 }))
+
+    expect((await response).t0).toBe(4444)
+    other.close()
+  })
+
+  it('closes a connection that sends a frame far larger than any message, and keeps serving', async () => {
+    const noisy = await connect()
+    noisy.on('error', () => undefined)
+    const closed = new Promise<number>((resolve) => noisy.on('close', resolve))
+    const other = await connect()
+    const response = waitForMessage(other, 'measureResponse')
+
+    noisy.send('x'.repeat(1024 * 1024))
+    expect(await closed).toBe(1009)
+    other.send(JSON.stringify({ message: 'measure', t0: 4545 }))
+
+    expect((await response).t0).toBe(4545)
+    other.close()
+  })
+})
+
+describe('webSocketService with an admin registration whose handling fails', () => {
+  it('logs the failure and keeps serving, also after it has waited on the database', async () => {
+    const errors = vi.spyOn(logger, 'error')
+    const info = logger.info.bind(logger)
+    // The line logged once the registration has been checked against the database.
+    const failing = vi.spyOn(logger, 'info').mockImplementation((message: unknown, ...rest: unknown[]) => {
+      if (String(message).endsWith('is admin')) throw new Error('admin handling blew up')
+      return info(String(message), ...rest)
+    })
+    const performanceId = String(await createTestPerformance())
+    const port = (global.testWss.address() as WebSocket.AddressInfo).port
+    const admin = new WebSocket(`ws://localhost:${port}/`, { headers: { cookie: authCookie } })
+    await new Promise((resolve) => admin.on('open', resolve))
+    const other = await connect()
+    const response = waitForMessage(other, 'measureResponse')
+
+    admin.send(JSON.stringify({ message: 'isAdmin', performanceId }))
+    await vi.waitFor(() => expect(errors).toHaveBeenCalledWith(expect.stringContaining('admin handling blew up')))
+    failing.mockRestore()
+    other.send(JSON.stringify({ message: 'measure', t0: 4646 }))
+
+    expect((await response).t0).toBe(4646)
+    admin.close()
     other.close()
   })
 })

@@ -48,9 +48,16 @@ export class SadissWebSocket extends WebSocket {
   }
 }
 
+/**
+ * The largest frame a client may send. Every message a client sends is a few
+ * hundred bytes; a larger frame closes the connection instead of being read.
+ */
+const MAX_INBOUND_FRAME_BYTES = 64 * 1024
+
 export class SadissWebSocketServer extends WebSocketServer<typeof SadissWebSocket> {
   constructor(options: ServerOptions) {
     super({
+      maxPayload: MAX_INBOUND_FRAME_BYTES,
       ...options,
       WebSocket: SadissWebSocket
     })

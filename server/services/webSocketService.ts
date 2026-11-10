@@ -68,6 +68,12 @@ export const startWebSocketServer = (port = 0, options: WebSocketServerOptions =
 
 const setupClientEventHandlers = (wss: SadissWebSocketServer, client: SadissWebSocket) => {
   client.on('pong', handlePong(client))
+  // ws reports a frame it cannot read, such as invalid UTF-8 or one over the
+  // size limit, as an error, and closes the socket itself. Without a listener
+  // the error would end the process.
+  client.on('error', (err) =>
+    logger.warn(`Closed client ${client.id}, which sent a frame that could not be read: ${err.message}`)
+  )
   client.onclose = handleClose(client)
   client.onmessage = handleMessage(wss, client)
 }
@@ -97,12 +103,16 @@ const handleMessage = (wss: SadissWebSocketServer, client: SadissWebSocket) => (
         measurementService.handleMeasure(client, parsed)
         break
       case 'isAdmin':
-        void registerAdmin(wss, client, parsed)
+        registerAdmin(wss, client, parsed).catch((err: unknown) => logHandlingFailure(client, err))
         break
     }
   } catch (err) {
-    logger.error(`Dropped a message from ${client.id} whose handling failed: ${err instanceof Error ? err.message : String(err)}`)
+    logHandlingFailure(client, err)
   }
+}
+
+const logHandlingFailure = (client: SadissWebSocket, err: unknown) => {
+  logger.error(`Dropped a message from ${client.id} whose handling failed: ${err instanceof Error ? err.message : String(err)}`)
 }
 
 const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) => {
