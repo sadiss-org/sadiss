@@ -9,7 +9,8 @@ import { User } from '../models/user'
 import { hashPassword } from '../services/authService'
 import path from 'path'
 import { app, server, wss } from '../server'
-import { beforeAll, beforeEach, afterEach, afterAll, vi } from 'vitest'
+import { beforeAll, beforeEach, afterEach, afterAll, inject, vi } from 'vitest'
+import { randomUUID } from 'crypto'
 
 dotenv.config({ path: '.env.test' })
 
@@ -24,8 +25,10 @@ export let mockUser: { id: string; username: string; email: string; password: st
 export let authCookie = ''
 
 beforeAll(async () => {
-  // Connect to the in-memory database
-  await connectDB()
+  // A database of this file's own on the run's shared in-memory server (tests/globalSetup.ts).
+  const uri = new URL(inject('mongoUri'))
+  uri.pathname = `/test-${randomUUID()}`
+  await connectDB(uri.toString())
 
   // Make wss available globally
   global.testWss = wss
@@ -91,6 +94,7 @@ afterEach(async () => {
 })
 
 afterAll(async () => {
+  await mongoose.connection.dropDatabase()
   await disconnectDB()
   server.close()
   wss.close()
