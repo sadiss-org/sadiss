@@ -34,7 +34,7 @@ export function useWebsocketConnection() {
         clientId: mainStore.choirId,
         ttsLang: mainStore.selectedLanguage,
         performanceId: mainStore.performanceId,
-        ...(identity && { device: identity() })
+        device: identity()
       }),
       clockSync: measurement,
       onPlayback: handlePlayback,

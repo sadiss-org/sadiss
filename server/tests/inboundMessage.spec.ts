@@ -103,7 +103,8 @@ describe('reading a frame as one of our messages', () => {
     it.each([
       ['that is not an object', 'phone'],
       ['with a field that is not a string', { ...device, appBuild: 12 }],
-      ['missing a field', { ...device, model: undefined }]
+      ['missing a field', { ...device, model: undefined }],
+      ['with a field far longer than a real one', { ...device, model: 'x'.repeat(10_000) }]
     ])('registers a device whose identity is malformed, %s, without the identity', (_, malformed) => {
       const parsed = read({ message: 'clientInfo', clientId: 0, ttsLang, performanceId: 'abc', device: malformed })
       expect(parsed).toMatchObject({ message: 'clientInfo', clientId: 0 })

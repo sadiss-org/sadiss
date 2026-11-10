@@ -33,25 +33,29 @@ const isFrame = (value: unknown): value is Frame => typeof value === 'object' &&
 const isTtsLang = (value: unknown): value is { iso: string; lang: string } =>
   isFrame(value) && typeof value.iso === 'string' && typeof value.lang === 'string'
 
-const isOptional = (value: unknown, is: (candidate: unknown) => boolean) => value === undefined || is(value)
+const isOptional = <T>(value: unknown, is: (candidate: unknown) => candidate is T): value is T | undefined =>
+  value === undefined || is(value)
 
-const isString = (value: unknown) => typeof value === 'string'
-const isNumber = (value: unknown) => typeof value === 'number'
+const isString = (value: unknown): value is string => typeof value === 'string'
+const isNumber = (value: unknown): value is number => typeof value === 'number'
 
-const isText = (value: unknown): value is string => typeof value === 'string'
+/** The longest a field of a phone's identity may be; a longer one is not a real identity. */
+const MAX_DEVICE_TEXT = 100
 
-/** A phone's identity, or nothing when any field is missing or not a string. */
+const isDeviceText = (value: unknown): value is string => isString(value) && value.length <= MAX_DEVICE_TEXT
+
+/** A phone's identity, or nothing when any field is missing, not a string, or longer than a real one. */
 const readDevice = (value: unknown): DeviceIdentity | undefined => {
   if (!isFrame(value)) return undefined
   const { id, appVersion, appBuild, platform, osVersion, model, network } = value
   if (
-    isText(id) &&
-    isText(appVersion) &&
-    isText(appBuild) &&
-    isText(platform) &&
-    isText(osVersion) &&
-    isText(model) &&
-    isText(network)
+    isDeviceText(id) &&
+    isDeviceText(appVersion) &&
+    isDeviceText(appBuild) &&
+    isDeviceText(platform) &&
+    isDeviceText(osVersion) &&
+    isDeviceText(model) &&
+    isDeviceText(network)
   ) {
     return { id, appVersion, appBuild, platform, osVersion, model, network }
   }
@@ -73,20 +77,20 @@ const readClientInfo = (frame: Frame): ClientInfoMessage | undefined => {
 
   return {
     message: 'clientInfo',
-    clientId: frame.clientId as number,
+    clientId: frame.clientId,
     ttsLang: frame.ttsLang,
-    performanceId: frame.performanceId as string,
-    protocolVersion: frame.protocolVersion as number | undefined,
+    performanceId: frame.performanceId,
+    protocolVersion: frame.protocolVersion,
     ...(device && { device })
   }
 }
 
 const readMeasure = (frame: Frame): MeasureMessage | undefined =>
-  isNumber(frame.t0) ? { message: 'measure', t0: frame.t0 as number } : undefined
+  isNumber(frame.t0) ? { message: 'measure', t0: frame.t0 } : undefined
 
 const readAdminRegistration = (frame: Frame): AdminRegistrationMessage | undefined =>
   isOptional(frame.performanceId, isString)
-    ? { message: 'isAdmin', performanceId: frame.performanceId as string | undefined }
+    ? { message: 'isAdmin', performanceId: frame.performanceId }
     : undefined
 
 // A Map, so a type sent by a client finds only these readers, never a property
@@ -120,7 +124,7 @@ export const readInboundMessage = (
     return undefined
   }
 
-  const read = readers.get(parsed.message as string)
+  const read = readers.get(parsed.message)
   if (!read) {
     logger.debug(`Ignored a message of an unknown type: ${parsed.message}`)
     return undefined
@@ -129,7 +133,7 @@ export const readInboundMessage = (
   const message = read(parsed)
   if (!message) {
     logger.warn(`Discarded a malformed ${parsed.message} message: ${raw.slice(0, 200)}`)
-    onMalformed(parsed.message as string)
+    onMalformed(parsed.message)
   }
 
   return message
