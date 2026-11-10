@@ -68,32 +68,51 @@ export const startWebSocketServer = (port = 0, options: WebSocketServerOptions =
 
 const setupClientEventHandlers = (wss: SadissWebSocketServer, client: SadissWebSocket) => {
   client.on('pong', handlePong(client))
+  // ws reports a frame it cannot read, such as invalid UTF-8 or one over the
+  // size limit, as an error, and closes the socket itself. Without a listener
+  // the error would end the process.
+  client.on('error', (err) =>
+    logger.warn(`Closed client ${client.id}, which sent a frame that could not be read: ${err.message}`)
+  )
   client.onclose = handleClose(client)
   client.onmessage = handleMessage(wss, client)
 }
 
+/**
+ * Handles one frame from a client. Anyone can open a socket, and nothing above
+ * this catches what it throws, so a failure here would end the process and drop
+ * every phone. It costs the one frame instead, and is logged.
+ */
 const handleMessage = (wss: SadissWebSocketServer, client: SadissWebSocket) => (event: WebSocket.MessageEvent) => {
   client.lastSeenAt = Date.now()
 
-  const parsed = readInboundMessage(event.data.toString())
-  if (!parsed) {
-    return
-  }
+  try {
+    const parsed = readInboundMessage(event.data.toString())
+    if (!parsed) {
+      return
+    }
 
-  logger.debug(`Received message from ws client: ${parsed.message}`)
+    logger.debug(`Received message from ws client: ${parsed.message}`)
 
-  switch (parsed.message) {
-    case 'clientInfo':
-      registerDevice(client, parsed)
-      break
-    case 'measure':
-      client.reportsRegularly = true
-      measurementService.handleMeasure(client, parsed)
-      break
-    case 'isAdmin':
-      void registerAdmin(wss, client, parsed)
-      break
+    switch (parsed.message) {
+      case 'clientInfo':
+        registerDevice(client, parsed)
+        break
+      case 'measure':
+        client.reportsRegularly = true
+        measurementService.handleMeasure(client, parsed)
+        break
+      case 'isAdmin':
+        registerAdmin(wss, client, parsed).catch((err: unknown) => logHandlingFailure(client, err))
+        break
+    }
+  } catch (err) {
+    logHandlingFailure(client, err)
   }
+}
+
+const logHandlingFailure = (client: SadissWebSocket, err: unknown) => {
+  logger.error(`Dropped a message from ${client.id} whose handling failed: ${err instanceof Error ? err.message : String(err)}`)
 }
 
 const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) => {

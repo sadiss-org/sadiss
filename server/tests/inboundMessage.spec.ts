@@ -33,6 +33,13 @@ describe('reading a frame as one of our messages', () => {
     it('discards a message type it does not know', () => {
       expect(read({ message: 'somethingElse', clientId: 0 })).toBeUndefined()
     })
+
+    it.each(['__proto__', 'constructor', 'valueOf', 'hasOwnProperty', 'toString'])(
+      'discards a message type named after %s, which every object inherits',
+      (message) => {
+        expect(read({ message })).toBeUndefined()
+      }
+    )
   })
 
   describe('the handshake a device registers with', () => {
