@@ -353,6 +353,72 @@ describe('the performance log file', () => {
     expect(recordsOf(performanceId)).toEqual([])
   })
 
+  it(
+    "records a message it cannot read from a registered device in that device's performance file",
+    { timeout: 10000 },
+    async () => {
+      const performanceId = (await createTestPerformance()).toString()
+      const device = await openDevice(global.testWss)
+
+      await register(device, performanceId, 0)
+      await waitForRecords(performanceId, 1)
+      device.ws.send(JSON.stringify({ message: 'measure', t0: 'now' }))
+      device.ws.close()
+
+      const records = await waitForRecords(performanceId, 3)
+      const connection = records[0].connection
+      expect(records.map(({ t, ...record }) => record)).toEqual([
+        expect.objectContaining({ type: 'register', connection }),
+        { type: 'malformedMessage', connection, message: 'measure' },
+        { type: 'disconnect', connection, reason: 'closed', code: 1005 }
+      ])
+      expect(recordsOf('server').map((record) => record.type)).toEqual(['connect'])
+    }
+  )
+
+  it(
+    'looks a performance up again when the device sends its clientInfo again after a lookup that failed',
+    { timeout: 10000 },
+    async () => {
+      const performanceId = (await createTestPerformance()).toString()
+      vi.spyOn(SadissPerformance, 'exists').mockImplementationOnce(() => {
+        throw new Error('connection to the database was lost')
+      })
+      const device = await openDevice(global.testWss)
+
+      await register(device, performanceId, 0)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      await register(device, performanceId, 0)
+
+      const records = await waitForRecords(performanceId, 1)
+      expect(records.map((record) => record.type)).toEqual(['register'])
+      device.ws.close()
+      await waitForRecords(performanceId, 2)
+    }
+  )
+
+  it(
+    'records a device that becomes an admin as having left its performance, as soon as it does',
+    { timeout: 10000 },
+    async () => {
+      const performanceId = (await createTestPerformance()).toString()
+      const device = await openDevice(global.testWss, { headers: { Cookie: authCookie } })
+
+      await register(device, performanceId, 0)
+      await waitForRecords(performanceId, 1)
+      device.ws.send(JSON.stringify({ message: 'isAdmin', performanceId }))
+      await waitFor('the first admin info', () => device.frames.find((frame) => frame.includes('adminInfo')))
+
+      const records = await waitForRecords(performanceId, 2)
+      expect(records.map(({ t, ...record }) => record)).toEqual([
+        expect.objectContaining({ type: 'register', connection: records[0].connection }),
+        { type: 'disconnect', connection: records[0].connection, reason: 'switched' }
+      ])
+      device.ws.close()
+      await waitForRecords('server', 2)
+    }
+  )
+
   it('looks a performance up once for a device that sends the same clientInfo again', { timeout: 10000 }, async () => {
     const performanceId = (await createTestPerformance()).toString()
     const lookups = vi.spyOn(SadissPerformance, 'exists')

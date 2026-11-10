@@ -20,9 +20,9 @@ export type PerformanceRecord =
       ttsLang: { iso: string; lang: string }
       protocolVersion: number
     }
-  /** A registered device's socket closed: by the device or the network, or because the heartbeat gave up on it. */
-  | Disconnect
-  /** A registered device said it plays another performance, so its records go elsewhere from now on. */
+  /** What a registered device's connection recorded while it belonged to this performance. */
+  | ConnectionRecord
+  /** A registered device said it plays another performance or became an admin, so its records go elsewhere from now on. */
   | { type: 'disconnect'; connection: string; reason: 'switched' }
   /** An admin started a track. */
   | { type: 'start'; trackId: string; loop: boolean; startAtChunk: number }
@@ -44,19 +44,27 @@ export type ServerRecord =
   /** A socket opened. */
   | { type: 'connect'; connection: string }
   /**
-   * A socket sent one of the messages the server accepts, named in `message`, in
-   * a shape it cannot read, so the message was ignored. A clientInfo ignored this
-   * way leaves the device unregistered.
-   */
-  | { type: 'malformedMessage'; connection: string; message: string }
-  /**
-   * A socket closed whose records were not going to a performance's file: one
-   * that never registered, an admin, or a device whose performance does not
+   * What a connection recorded while its records went to no performance's file:
+   * one that never registered, an admin, or a device whose performance does not
    * exist, is still being looked up, or that it switched away from.
    */
-  | Disconnect
+  | ConnectionRecord
   /** Lines before this one were lost because they could not be written; written by the log itself. */
   | DroppedRecord
+
+/**
+ * Something a connection records in whichever file its records go to when it
+ * happens (services/connectionLog.ts decides which).
+ */
+export type ConnectionRecord =
+  /**
+   * The socket sent one of the messages the server accepts, named in `message`,
+   * in a shape it cannot read, so the message was ignored. A clientInfo ignored
+   * this way leaves the device unregistered.
+   */
+  | { type: 'malformedMessage'; connection: string; message: string }
+  /** The socket closed: by the device or the network, or because the heartbeat gave up on it. */
+  | Disconnect
 
 /** Why a socket closed: `heartbeat` when the server gave up on a peer that went quiet, `closed` for everything else. */
 export type CloseReason = 'closed' | 'heartbeat'
