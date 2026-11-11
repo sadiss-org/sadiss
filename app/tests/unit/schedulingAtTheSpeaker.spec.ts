@@ -110,6 +110,28 @@ describe('a phone schedules its sound for when it leaves the speaker', () => {
     expect(scheduleOffset(player)).toBeCloseTo(renderOffset(50) + 0.02, 6)
   })
 
+  it('does not trust an output timestamp that is far from the audio clock, as on iOS 16', () => {
+    // Measured on an iPhone SE with iOS 16.6.1: the stamp's audio time stays near
+    // zero while the context has been running for minutes.
+    const player = preparedPlayer({
+      currentTime: 300,
+      outputLatency: 0.02,
+      stamp: { contextTime: 0.0067, performanceTime: PAGE_NOW_MS - 10 }
+    })
+
+    expect(scheduleOffset(player)).toBeCloseTo(renderOffset(300) + 0.02, 6)
+  })
+
+  it('does not trust an output timestamp ahead of the render position', () => {
+    const player = preparedPlayer({
+      currentTime: 50,
+      outputLatency: 0.02,
+      stamp: { contextTime: 50.5, performanceTime: PAGE_NOW_MS - 10 }
+    })
+
+    expect(scheduleOffset(player)).toBeCloseTo(renderOffset(50) + 0.02, 6)
+  })
+
   it('does not trust an output timestamp from before the first sound left the speaker', () => {
     const player = preparedPlayer({
       currentTime: 50,
