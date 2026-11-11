@@ -1,7 +1,16 @@
 import { createMeasurementController } from '@/composables/measurementController'
+import { PhoneReport } from '@/types/measurement'
 
 /** Builds a controller with a scripted clock and captured outbound messages. */
-const setup = (opts: { nowSeq?: number[] } = {}) => {
+const report: PhoneReport = {
+  clock: { offsetMs: 12, rttMs: 30, roundTrips: 5, connectedForMs: 20000 },
+  audio: null,
+  visible: true,
+  keepAlivePlaying: false,
+  lastChunk: { index: 3, leadMs: 900 }
+}
+
+const setup = (opts: { nowSeq?: number[]; report?: () => PhoneReport } = {}) => {
   const sent: any[] = []
   const roundTrips: any[] = []
   let tick = 0
@@ -9,7 +18,8 @@ const setup = (opts: { nowSeq?: number[] } = {}) => {
   const controller = createMeasurementController({
     now: () => (nowSeq ? nowSeq.shift()! : ++tick),
     send: (message) => sent.push(message),
-    onRoundTrip: (rt) => roundTrips.push(rt)
+    onRoundTrip: (rt) => roundTrips.push(rt),
+    report: opts.report
   })
   return { controller, sent, roundTrips }
 }
@@ -48,5 +58,55 @@ describe('measurementController', () => {
     controller.handleMessage({ message: 'somethingElse' } as any)
     expect(sent).toHaveLength(0)
     expect(roundTrips).toHaveLength(0)
+  })
+
+  it('sends the phone report with each ping once the server asks for it', () => {
+    const { controller, sent } = setup({ nowSeq: [500], report: () => report })
+    controller.handleMessage({ message: 'measureConfig', config: { intervalMs: 3000, report: true } })
+    controller.ping()
+    expect(sent).toEqual([{ message: 'measure', t0: 500, report }])
+  })
+
+  it.each([
+    ['says no', { intervalMs: 3000, report: false }],
+    ['does not say, as an older one', { intervalMs: 3000 }]
+  ])('sends exactly the bare ping when the server %s', (_, config) => {
+    const { controller, sent } = setup({ nowSeq: [500], report: () => report })
+    controller.handleMessage({ message: 'measureConfig', config })
+    controller.ping()
+    expect(sent).toEqual([{ message: 'measure', t0: 500 }])
+  })
+
+  it('still pings when the report cannot be made', () => {
+    const { controller, sent } = setup({
+      nowSeq: [500],
+      report: () => {
+        throw new Error('no audio context')
+      }
+    })
+    controller.handleMessage({ message: 'measureConfig', config: { intervalMs: 3000, report: true } })
+    controller.ping()
+    expect(sent).toEqual([{ message: 'measure', t0: 500 }])
+  })
+
+  it('stamps the ping after the report is made, so making it does not count toward the round trip', () => {
+    const order: string[] = []
+    const sent: unknown[] = []
+    const controller = createMeasurementController({
+      now: () => {
+        order.push('stamped')
+        return 500
+      },
+      send: (message) => sent.push(message),
+      report: () => {
+        order.push('report made')
+        return report
+      }
+    })
+    controller.handleMessage({ message: 'measureConfig', config: { intervalMs: 3000, report: true } })
+
+    controller.ping()
+
+    expect(order).toEqual(['report made', 'stamped'])
   })
 })

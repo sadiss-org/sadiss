@@ -1,15 +1,18 @@
 import WebSocket from 'ws'
 import { progressOf, runningSessionCount } from './playbackService'
 import { PlaybackProgress } from '../playbackSession'
-import { logger } from '../tools'
+import { logger, reasonOf } from '../tools'
 import { ClientInfoMessage, CURRENT_PROTOCOL_VERSION, readProtocolVersion } from '../types'
 import { measurementService } from './measurement'
+import { PROTOCOL_VERSION_WITH_REPORTS } from './measurementService'
+import { performanceLogFiles } from './performanceLogFiles'
+import { createConnectionLog } from './connectionLog'
+import { startHealthSampler } from '../lib/serverHealth'
 import { v4 as uuidv4 } from 'uuid'
 import { SadissWebSocketServer, SadissWebSocket } from '../lib/SadissWebsocket'
 import { AdminRegistrationMessage, readInboundMessage } from '../lib/inboundMessage'
 import { authenticatedUserId } from '../lib/adminAuth'
 import { SadissPerformance, visibleTo } from '../models/sadissPerformance'
-import { isValidObjectId } from 'mongoose'
 import {
   DEFAULT_TICK_MS,
   LIMITS_FOR_A_QUIET_PEER,
@@ -27,6 +30,9 @@ import {
  */
 const ADMIN_INFO_INTERVAL_MS = 1000
 
+/** How often the server's health is sampled into the server-wide log. */
+const HEALTH_EVERY_MS = 5000
+
 interface HeartbeatOptions {
   /** How often the connections are looked at. */
   tickMs: number
@@ -39,6 +45,8 @@ interface WebSocketServerOptions {
   heartbeat?: HeartbeatOptions
   /** How often each admin is told the state of the room. */
   adminInfoIntervalMs?: number
+  /** How often the server's health is written to the server-wide log. */
+  healthEveryMs?: number
 }
 
 /**
@@ -51,6 +59,12 @@ export const startWebSocketServer = (port = 0, options: WebSocketServerOptions =
 
   watchConnections(wss, options.heartbeat)
   startAdminInfoUpdates(wss, options.adminInfoIntervalMs ?? ADMIN_INFO_INTERVAL_MS)
+  const stopHealthSampler = startHealthSampler({
+    everyMs: options.healthEveryMs ?? HEALTH_EVERY_MS,
+    sockets: () => wss.clients.size,
+    write: (record) => performanceLogFiles.server.write(record)
+  })
+  wss.on('close', stopHealthSampler)
 
   wss.on('connection', (client, request) => {
     request.socket.setKeepAlive(true, 60000) // Might help with idle connections. Main mechanism is the heartbeat.
@@ -61,6 +75,7 @@ export const startWebSocketServer = (port = 0, options: WebSocketServerOptions =
     logger.info(`New client connected! Assigned id: ${client.id} Total clients: ${wss.clients.size}`)
 
     setupClientEventHandlers(wss, client)
+    connectionLog.opened(client)
   })
 
   return wss
@@ -68,32 +83,59 @@ export const startWebSocketServer = (port = 0, options: WebSocketServerOptions =
 
 const setupClientEventHandlers = (wss: SadissWebSocketServer, client: SadissWebSocket) => {
   client.on('pong', handlePong(client))
+  // ws reports a frame it cannot read, such as invalid UTF-8 or one over the
+  // size limit, as an error, and closes the socket itself. Without a listener
+  // the error would end the process.
+  client.on('error', (err) =>
+    logger.warn(`Closed client ${client.id}, which sent a frame that could not be read: ${err.message}`)
+  )
   client.onclose = handleClose(client)
   client.onmessage = handleMessage(wss, client)
 }
 
+/**
+ * Handles one frame from a client. Anyone can open a socket, and nothing above
+ * this catches what it throws, so a failure here would end the process and drop
+ * every phone. It costs the one frame instead, and is logged.
+ */
 const handleMessage = (wss: SadissWebSocketServer, client: SadissWebSocket) => (event: WebSocket.MessageEvent) => {
   client.lastSeenAt = Date.now()
 
-  const parsed = readInboundMessage(event.data.toString())
-  if (!parsed) {
-    return
-  }
+  try {
+    const parsed = readInboundMessage(event.data.toString(), (message) =>
+      connectionLog.write(client, { type: 'malformedMessage', message })
+    )
+    if (!parsed) {
+      return
+    }
 
-  logger.debug(`Received message from ws client: ${parsed.message}`)
+    logger.debug(`Received message from ws client: ${parsed.message}`)
 
-  switch (parsed.message) {
-    case 'clientInfo':
-      registerDevice(client, parsed)
-      break
-    case 'measure':
-      client.reportsRegularly = true
-      measurementService.handleMeasure(client, parsed)
-      break
-    case 'isAdmin':
-      void registerAdmin(wss, client, parsed)
-      break
+    switch (parsed.message) {
+      case 'clientInfo':
+        registerDevice(client, parsed)
+        break
+      case 'measure':
+        client.reportsRegularly = true
+        measurementService.handleMeasure(client, parsed)
+        // After the answer, so the round trip never waits on the log.
+        // Only from a phone that said in its handshake that it speaks a version that reports, so a
+        // socket that never introduced itself cannot fill the log.
+        if (parsed.report && client.protocolVersion >= PROTOCOL_VERSION_WITH_REPORTS) {
+          connectionLog.write(client, { type: 'phone', deviceId: client.device?.id ?? null, ...parsed.report })
+        }
+        break
+      case 'isAdmin':
+        registerAdmin(wss, client, parsed).catch((err: unknown) => logHandlingFailure(client, err))
+        break
+    }
+  } catch (err) {
+    logHandlingFailure(client, err)
   }
+}
+
+const logHandlingFailure = (client: SadissWebSocket, err: unknown) => {
+  logger.error(`Dropped a message from ${client.id} whose handling failed: ${reasonOf(err)}`)
 }
 
 const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) => {
@@ -101,6 +143,7 @@ const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) 
   client.ttsLang = clientInfo.ttsLang
   client.performanceId = clientInfo.performanceId
   client.protocolVersion = readProtocolVersion(clientInfo)
+  client.device = clientInfo.device
 
   logger.info(
     `Performance ${client.performanceId}: Client ${client.id} registered with choir id ${client.choirId}, TTS lang ${client.ttsLang.iso} and protocol version ${client.protocolVersion}`
@@ -108,8 +151,43 @@ const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) 
 
   client.send('clientInfoReceived')
   // Tell the device how often to run the clock-sync round trip.
-  client.send(JSON.stringify(measurementService.buildConfigMessage()))
+  client.send(JSON.stringify(measurementService.buildConfigMessage(client.protocolVersion)))
+
+  connectionLog.identified(client)
 }
+
+/** How a performance id is written: the one spelling an ObjectId prints as. */
+const OBJECT_ID = /^[0-9a-f]{24}$/
+
+/**
+ * Whether a performance with this id matching `filter` exists, or undefined
+ * when the database could not say. `what` names the check in the console
+ * message for a failed lookup.
+ */
+const findPerformance = async (performanceId: string, filter: object, what: string) => {
+  // Mongo also matches other spellings of the same id, which would each name a file of their own.
+  if (!OBJECT_ID.test(performanceId)) return false
+
+  try {
+    return !!(await SadissPerformance.exists({ _id: performanceId, ...filter }))
+  } catch (err) {
+    logger.error(`Failed checking whether performance ${performanceId} ${what}: ${reasonOf(err)}`)
+    return undefined
+  }
+}
+
+/** Whether the performance a device named exists, for its records to go to that performance's file. */
+const performanceExists = (performanceId: string) => findPerformance(performanceId, {}, 'exists')
+
+/**
+ * Whether this account may follow the performance as an admin. No when that
+ * could not be found out: an operator without a progress bar is better than a
+ * stranger with one.
+ */
+const mayFollow = async (userId: string, performanceId: string) =>
+  (await findPerformance(performanceId, visibleTo(userId), `is visible to ${userId}`)) === true
+
+const connectionLog = createConnectionLog(performanceLogFiles, performanceExists)
 
 /**
  * What an admin is given is the state of the room: how many devices are
@@ -134,6 +212,7 @@ const registerAdmin = async (
   }
 
   client.isAdmin = true
+  connectionLog.identified(client)
 
   if (registration.performanceId) {
     client.performanceId = registration.performanceId
@@ -143,20 +222,10 @@ const registerAdmin = async (
   client.send(JSON.stringify(createAdminInfoMessage(wss, registration.performanceId)))
 }
 
-/** Refuses when the lookup fails: an operator without a progress bar is better than a stranger with one. */
-const mayFollow = async (userId: string, performanceId: string) => {
-  if (!isValidObjectId(performanceId)) return false
-
-  try {
-    return !!(await SadissPerformance.exists({ _id: performanceId, ...visibleTo(userId) }))
-  } catch (err) {
-    logger.error(`Failed checking whether performance ${performanceId} is visible to ${userId}:`, err)
-    return false
-  }
-}
-
-const handleClose = (client: SadissWebSocket) => () => {
+const handleClose = (client: SadissWebSocket) => (event: WebSocket.CloseEvent) => {
   logger.info(`Client has disconnected! id: ${client.id}`)
+
+  connectionLog.write(client, { type: 'disconnect', reason: client.closeReason, code: event.code })
 }
 
 const handlePong = (client: SadissWebSocket) => () => {
@@ -177,7 +246,12 @@ const limitsFor = (client: SadissWebSocket, quiet: LivenessLimits) =>
 const watchConnections = (wss: SadissWebSocketServer, options?: HeartbeatOptions) =>
   startHeartbeat(
     () => wss.clients,
-    (client) => logger.info(`${client.isAdmin ? 'Admin' : 'Client'} went quiet and was given up on! id: ${client.id}`),
+    (client) => {
+      // The socket is already terminated, but ws reports the close only on a
+      // later tick, so the reason set here is the one the close handler reads.
+      client.closeReason = 'heartbeat'
+      logger.info(`${client.isAdmin ? 'Admin' : 'Client'} went quiet and was given up on! id: ${client.id}`)
+    },
     (client) => limitsFor(client, options?.quiet ?? LIMITS_FOR_A_QUIET_PEER),
     options?.tickMs ?? DEFAULT_TICK_MS
   )

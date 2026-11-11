@@ -33,6 +33,13 @@ describe('reading a frame as one of our messages', () => {
     it('discards a message type it does not know', () => {
       expect(read({ message: 'somethingElse', clientId: 0 })).toBeUndefined()
     })
+
+    it.each(['__proto__', 'constructor', 'valueOf', 'hasOwnProperty', 'toString'])(
+      'discards a message type named after %s, which every object inherits',
+      (message) => {
+        expect(read({ message })).toBeUndefined()
+      }
+    )
   })
 
   describe('the handshake a device registers with', () => {
@@ -64,6 +71,46 @@ describe('reading a frame as one of our messages', () => {
       expect(parsed).not.toHaveProperty('extra')
     })
 
+    const device = {
+      id: '1f0e6c3a-6a5b-4c1e-9d55-3c1f2b7a9e10',
+      appVersion: '2.2.0',
+      appBuild: '12',
+      platform: 'android',
+      osVersion: '13',
+      model: 'MAR-LX1A',
+      network: 'wifi'
+    }
+
+    it('keeps who the device is when it says', () => {
+      const parsed = read({ message: 'clientInfo', clientId: 0, ttsLang, performanceId: 'abc', protocolVersion: 3, device })
+      expect(parsed).toMatchObject({ device })
+    })
+
+    it('drops keys the device identity was not expected to carry', () => {
+      const parsed = read({
+        message: 'clientInfo',
+        clientId: 0,
+        ttsLang,
+        performanceId: 'abc',
+        device: { ...device, extra: 'x' }
+      })
+      expect(parsed).toMatchObject({ device })
+      expect(parsed).not.toHaveProperty('device.extra')
+    })
+
+    // Who a phone is only goes into the log, so a malformed identity costs the
+    // log that detail, never the phone its registration.
+    it.each([
+      ['that is not an object', 'phone'],
+      ['with a field that is not a string', { ...device, appBuild: 12 }],
+      ['missing a field', { ...device, model: undefined }],
+      ['with a field far longer than a real one', { ...device, model: 'x'.repeat(10_000) }]
+    ])('registers a device whose identity is malformed, %s, without the identity', (_, malformed) => {
+      const parsed = read({ message: 'clientInfo', clientId: 0, ttsLang, performanceId: 'abc', device: malformed })
+      expect(parsed).toMatchObject({ message: 'clientInfo', clientId: 0 })
+      expect(parsed).not.toHaveProperty('device')
+    })
+
     it.each([
       ['a choir id that is not a number', { clientId: '3' }],
       // ttsLang reaches `langs[ttsLang.iso]` when a phrase is picked, so a bare
@@ -84,6 +131,55 @@ describe('reading a frame as one of our messages', () => {
 
     // Without t0 the round trip tells the device nothing, so there is no point
     // stamping and echoing it.
+    const report = {
+      clock: { offsetMs: 12.5, rttMs: 30, roundTrips: 20, connectedForMs: 60000 },
+      audio: {
+        scheduleOffsetS: 1794334.2,
+        calibrationS: 0.12,
+        state: 'running',
+        outputLatency: 0.04,
+        baseLatency: 0.005,
+        sampleRate: 48000,
+        outputTimestamp: { contextTime: 12.3, performanceTime: 45678.9 }
+      },
+      visible: false,
+      keepAlivePlaying: true,
+      lastChunk: { index: 7, leadMs: 912.4 }
+    }
+
+    it('keeps the report a phone sends with it', () => {
+      expect(read({ message: 'measure', t0: 5, report })).toEqual({ message: 'measure', t0: 5, report })
+    })
+
+    it('keeps a report whose figures the phone could not give', () => {
+      const unknown = { clock: null, audio: null, visible: null, keepAlivePlaying: null, lastChunk: null }
+      expect(read({ message: 'measure', t0: 5, report: unknown })).toEqual({ message: 'measure', t0: 5, report: unknown })
+    })
+
+    // The report only goes into the log; the ping is the shared clock and must always be answered.
+    it('reads a figure of the wrong kind as unknown, and drops keys it does not expect', () => {
+      const parsed = read({
+        message: 'measure',
+        t0: 5,
+        report: {
+          ...report,
+          visible: 'yes',
+          clock: { ...report.clock, rttMs: '30' },
+          audio: { ...report.audio, state: 'x'.repeat(500) },
+          extra: 1
+        }
+      })
+      expect(parsed).toMatchObject({
+        t0: 5,
+        report: { visible: null, clock: { rttMs: null, offsetMs: 12.5 }, audio: { state: null } }
+      })
+      expect(parsed).not.toHaveProperty('report.extra')
+    })
+
+    it('answers a ping whose report is not an object, without the report', () => {
+      expect(read({ message: 'measure', t0: 5, report: 'broken' })).toEqual({ message: 'measure', t0: 5 })
+    })
+
     it('discards one with no send stamp', () => {
       expect(read({ message: 'measure' })).toBeUndefined()
     })

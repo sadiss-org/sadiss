@@ -57,8 +57,11 @@ export async function getTrackDataForDownload(trackId: Types.ObjectId) {
   return track
 }
 
+/** Builds the zip a track is downloaded as, in the server's public folder, and resolves with its path. */
 export async function createTrackZip(track: TrackDocument): Promise<string> {
-  const zipFilePath = path.join(process.cwd(), `public/${track.name.replace(' ', '_')}.zip`)
+  const publicDir = path.join(process.cwd(), 'public')
+  await fs.promises.mkdir(publicDir, { recursive: true })
+  const zipFilePath = path.join(publicDir, `${track.name.replace(' ', '_')}.zip`)
   const output = fs.createWriteStream(zipFilePath)
   const archive = archiver('zip', {
     zlib: { level: 9 }
@@ -66,6 +69,8 @@ export async function createTrackZip(track: TrackDocument): Promise<string> {
 
   return new Promise((resolve, reject) => {
     output.on('close', () => resolve(zipFilePath))
+    // Without a listener, a file that cannot be written would end the process.
+    output.on('error', reject)
     archive.on('error', (err: Error) => reject(err))
     archive.on('warning', (err) => {
       if (err.code === 'ENOENT') {

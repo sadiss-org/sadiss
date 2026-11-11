@@ -50,3 +50,17 @@ describe('ServerClock', () => {
     expect(clock.offsetMs()).toBe(249)
   })
 })
+
+describe('what the clock says about its own estimate', () => {
+  it('has nothing to say before the first round trip', () => {
+    expect(new ServerClock().estimate()).toBeNull()
+  })
+
+  it('gives the offset, the median round trip of the round trips it uses, and how many it holds', () => {
+    const clock = new ServerClock(20, 0.5)
+    // Round trips of 10, 20, 30 and 40 ms, offset 1000 each; the two fastest are used.
+    for (const [i, rtt] of [10, 20, 30, 40].entries())
+      clock.add(rt(i * 1000, i * 1000 + 1000 + rtt / 2, i * 1000 + 1000 + rtt / 2, i * 1000 + rtt))
+    expect(clock.estimate()).toEqual({ offsetMs: 1000, rttMs: 15, roundTrips: 4 })
+  })
+})

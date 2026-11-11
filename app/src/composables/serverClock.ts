@@ -31,7 +31,8 @@ export const roundTripOffset = (r: RoundTrip): number => (r.serverRecv - r.t0 + 
 const median = (xs: number[]): number => {
   const s = [...xs].sort((a, b) => a - b)
   const mid = Math.floor(s.length / 2)
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
+  const upper = s[mid] ?? Number.NaN
+  return s.length % 2 ? upper : ((s[mid - 1] ?? upper) + upper) / 2
 }
 
 export class ServerClock {
@@ -51,10 +52,19 @@ export class ServerClock {
 
   /** Current offset estimate (ms), or null before any round trip. */
   offsetMs(): number | null {
+    return this.estimate()?.offsetMs ?? null
+  }
+
+  /**
+   * The offset estimate with what it rests on: the median round trip of the
+   * round trips it is made from, and how many the window holds. Null before
+   * any round trip.
+   */
+  estimate(): { offsetMs: number; rttMs: number; roundTrips: number } | null {
     if (!this.samples.length) return null
     const byRtt = [...this.samples].sort((a, b) => a.rtt - b.rtt)
     const keep = byRtt.slice(0, Math.max(1, Math.floor(byRtt.length * this.keepFraction)))
-    return median(keep.map((k) => k.offset))
+    return { offsetMs: median(keep.map((k) => k.offset)), rttMs: median(keep.map((k) => k.rtt)), roundTrips: this.samples.length }
   }
 
   /**

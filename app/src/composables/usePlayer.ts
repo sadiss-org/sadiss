@@ -2,6 +2,7 @@ import { reactive, ref } from 'vue'
 import { TextToSpeech } from '@capacitor-community/text-to-speech'
 import { PartialChunk, OscillatorObject, Breakpoint } from '../types/types'
 import { useMainStore } from '@/stores/MainStore'
+import type { DeviceState } from './deviceConnection'
 
 const BREAKPOINT_LENGTH = 0.01 // in seconds
 const AMP_MIN_VALUE = 0.000001
@@ -83,6 +84,16 @@ const startKeepAlive = () => {
     navigator.mediaSession.setActionHandler('play', () => {})
     navigator.mediaSession.setActionHandler('pause', () => {})
   }
+}
+
+/** A figure the platform may not give, such as `outputLatency` in older WebKit. */
+const finiteOrNull = (value: number | undefined) => (typeof value === 'number' && Number.isFinite(value) ? value : null)
+
+/** The audio clock against the page clock at the moment of output, where the platform has it. */
+const outputTimestamp = (context: AudioContext) => {
+  if (typeof context.getOutputTimestamp !== 'function') return null
+  const { contextTime, performanceTime } = context.getOutputTimestamp()
+  return { contextTime: finiteOrNull(contextTime), performanceTime: finiteOrNull(performanceTime) }
 }
 
 export function usePlayer() {
@@ -276,7 +287,25 @@ export function usePlayer() {
 
   const setOutputLatencyOffset = (newOutputLatencyOffset: number) => (outputLatencyOffset = newOutputLatencyOffset)
 
+  /** How playback is scheduled now and whether the app is in the foreground, for the phone report. */
+  const deviceState = (): DeviceState => ({
+    audio: ctx
+      ? {
+          scheduleOffsetS: finiteOrNull(offset),
+          calibrationS: outputLatencyOffset,
+          state: ctx.state,
+          outputLatency: finiteOrNull(ctx.outputLatency),
+          baseLatency: finiteOrNull(ctx.baseLatency),
+          sampleRate: finiteOrNull(ctx.sampleRate),
+          outputTimestamp: outputTimestamp(ctx)
+        }
+      : null,
+    keepAlivePlaying: keepAlive ? !keepAlive.paused : null,
+    visible: document.visibilityState === 'visible'
+  })
+
   return {
+    deviceState,
     handleChunkData,
     preparePlaybackAndTts,
     setStartTime,

@@ -8,12 +8,51 @@
 export interface MeasurementConfig {
   /** Target interval (ms) between clock-sync round trips. */
   intervalMs: number
+  /** Whether each ping carries a report on the phone's state. Absent, as from an older server, means no. */
+  report?: boolean
 }
 
 /** Client → server: a clock-sync ping carrying the client send timestamp. */
 export interface MeasureMessage {
   message: 'measure'
   t0: number
+  /** The phone's state, when the server asked for it. */
+  report?: PhoneReport
+}
+
+/**
+ * The state of a phone at one clock-sync ping, for the performance log: how
+ * well it keeps time, how its audio is scheduled and whether it is in the
+ * foreground. A figure the phone cannot give is null.
+ */
+export interface PhoneReport {
+  clock: {
+    /** Its estimate of server time minus its own clock, in ms. */
+    offsetMs: number
+    /** The median of the faster half of its round trips, which the estimate uses, in ms. */
+    rttMs: number
+    /** How many round trips its window holds; the estimate uses the faster half. */
+    roundTrips: number
+    /** How long the current connection has been open, in ms. */
+    connectedForMs: number
+  } | null
+  audio: {
+    /** Server time minus audio-clock time, in s, as playback schedules with it. */
+    scheduleOffsetS: number | null
+    /** The output latency set on the calibration page, in s. */
+    calibrationS: number
+    state: string | null
+    outputLatency: number | null
+    baseLatency: number | null
+    sampleRate: number | null
+    outputTimestamp: { contextTime: number | null; performanceTime: number | null } | null
+  } | null
+  /** Whether the app is in the foreground. */
+  visible: boolean | null
+  /** Whether the silent sound that keeps audio alive with the screen off is playing. */
+  keepAlivePlaying: boolean | null
+  /** The last chunk with partials the phone was sent, and how long before its sound it arrived, in ms. */
+  lastChunk: { index: number; leadMs: number | null } | null
 }
 
 /** Server → client: the ping echoed back with server clock stamps. */

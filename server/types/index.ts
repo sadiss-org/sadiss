@@ -13,10 +13,12 @@ import {
   MeasurementConfig,
   MeasureMessage,
   MeasureResponseMessage,
-  MeasureConfigMessage
+  MeasureConfigMessage,
+  PhoneReport
 } from './Measurement'
 import {
   ClientInfoMessage,
+  DeviceIdentity,
   CURRENT_PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
   UNVERSIONED_PROTOCOL_VERSION,
@@ -39,7 +41,9 @@ export {
   MeasureMessage,
   MeasureResponseMessage,
   MeasureConfigMessage,
+  PhoneReport,
   ClientInfoMessage,
+  DeviceIdentity,
   CURRENT_PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
   UNVERSIONED_PROTOCOL_VERSION,

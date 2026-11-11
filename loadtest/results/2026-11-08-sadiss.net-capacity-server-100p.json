@@ -1,0 +1,201 @@
+{
+  "serverCommit": "ad29734a5e80c2a0c4ffd3612b0768aa6dd71553",
+  "loadtestCommit": "19cd8db31fcecb865c01c91dc7d4ddffbb4ad0eb",
+  "target": {
+    "apiUrl": "https://sadiss.net/capacity/server",
+    "wsUrl": "wss://sadiss.net/capacity/ws/"
+  },
+  "runAt": "2026-11-08",
+  "generator": {
+    "cpu": "AMD Ryzen 7 8845HS w/ Radeon 780M Graphics",
+    "threads": 16,
+    "node": "v22.23.4",
+    "platform": "linux"
+  },
+  "note": "Run in the Vienna evening with the live instance idle, before results files existed; its time was not kept. Command: npm run loadtest -- --api https://sadiss.net/capacity/server --ws wss://sadiss.net/capacity/ws/ --phones 100",
+  "result": {
+    "phones": 100,
+    "latePhones": 0,
+    "track": {
+      "seconds": 30,
+      "partialsPerFrame": 16,
+      "choir": false,
+      "tts": null
+    },
+    "chunkCount": 30,
+    "arrivalLeadMs": {
+      "count": 3000,
+      "min": 559.54,
+      "median": 900.88,
+      "p1": 688.66,
+      "p95": 915.5,
+      "p99": 918.92,
+      "max": 920.85
+    },
+    "arrivalsWithoutClock": 0,
+    "missingChunks": 0,
+    "connects": 100,
+    "dropsDuringTrack": 0,
+    "dropsBeforeTrack": 0,
+    "roundTripMs": {
+      "count": 3149,
+      "min": 17.53,
+      "median": 24.12,
+      "p1": 18.56,
+      "p95": 46.95,
+      "p99": 265.65,
+      "max": 560.74
+    },
+    "roundTripsAtStart": {
+      "count": 100,
+      "min": 19,
+      "median": 20,
+      "p1": 19,
+      "p95": 21,
+      "p99": 21,
+      "max": 21
+    },
+    "offsetFromMedianMs": {
+      "count": 3400,
+      "min": 0,
+      "median": 0.21,
+      "p1": 0,
+      "p95": 0.67,
+      "p99": 0.86,
+      "max": 1.49
+    },
+    "lateOffsetFromMedianMs": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "phraseLeadMs": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "phrasesWithoutClock": 0,
+    "missingPhrases": 0,
+    "wrongPhrases": 0,
+    "generatorDelayMs": {
+      "p99": 0.84,
+      "max": 2.98
+    },
+    "serverCpuPct": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "serverRssMb": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "serverSockets": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "serverRestarts": null,
+    "boxLoad": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    },
+    "boxAvailableMb": {
+      "count": 0,
+      "min": null,
+      "median": null,
+      "p1": null,
+      "p95": null,
+      "p99": null,
+      "max": null
+    }
+  },
+  "verdict": {
+    "outcome": "pass",
+    "checks": [
+      {
+        "threshold": {
+          "figure": "arrivalLeadMs",
+          "statistic": "p1",
+          "bound": "atLeast",
+          "limit": 500,
+          "consequence": "fail"
+        },
+        "value": 688.66,
+        "passed": true
+      },
+      {
+        "threshold": {
+          "figure": "missingChunks",
+          "bound": "atMost",
+          "limit": 0,
+          "consequence": "fail"
+        },
+        "value": 0,
+        "passed": true
+      },
+      {
+        "threshold": {
+          "figure": "dropsDuringTrack",
+          "bound": "atMost",
+          "limit": 0,
+          "consequence": "fail"
+        },
+        "value": 0,
+        "passed": true
+      },
+      {
+        "threshold": {
+          "figure": "offsetFromMedianMs",
+          "statistic": "p99",
+          "bound": "atMost",
+          "limit": 10,
+          "consequence": "fail"
+        },
+        "value": 0.86,
+        "passed": true
+      },
+      {
+        "threshold": {
+          "figure": "generatorDelayMs",
+          "statistic": "p99",
+          "bound": "atMost",
+          "limit": 20,
+          "consequence": "invalid",
+          "reason": "the load generator fell behind, so this run says nothing about the server."
+        },
+        "value": 0.84,
+        "passed": true
+      }
+    ],
+    "invalidBecause": []
+  },
+  "serverSamples": [],
+  "notSampledBecause": "the run was made before the load test sampled the server."
+}

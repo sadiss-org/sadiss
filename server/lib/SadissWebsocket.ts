@@ -1,6 +1,7 @@
 import { Server, WebSocketServer, ServerOptions, WebSocket } from 'ws'
 import { logger } from '../tools'
-import { UNVERSIONED_PROTOCOL_VERSION } from '../types'
+import { DeviceIdentity, UNVERSIONED_PROTOCOL_VERSION } from '../types'
+import { CloseReason } from './logRecords'
 
 export class SadissWebSocket extends WebSocket {
   id = ''
@@ -20,6 +21,12 @@ export class SadissWebSocket extends WebSocket {
    * is told apart from one that belongs to another.
    */
   performanceId = ''
+  /** Who the phone said it is in its last handshake, if it said. */
+  device?: DeviceIdentity
+  /** When the socket opened, in milliseconds on the server's clock. */
+  readonly openedAt = Date.now()
+  /** Why the socket closed, as the performance log records it. */
+  closeReason: CloseReason = 'closed'
   /** When this peer was last heard from. See lib/heartbeat.ts. */
   lastSeenAt = Date.now()
   /**
@@ -48,9 +55,16 @@ export class SadissWebSocket extends WebSocket {
   }
 }
 
+/**
+ * The largest frame a client may send. Every message a client sends is a few
+ * hundred bytes; a larger frame closes the connection instead of being read.
+ */
+const MAX_INBOUND_FRAME_BYTES = 64 * 1024
+
 export class SadissWebSocketServer extends WebSocketServer<typeof SadissWebSocket> {
   constructor(options: ServerOptions) {
     super({
+      maxPayload: MAX_INBOUND_FRAME_BYTES,
       ...options,
       WebSocket: SadissWebSocket
     })

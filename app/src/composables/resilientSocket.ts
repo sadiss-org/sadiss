@@ -43,7 +43,7 @@ export interface ResilientSocketOptions {
   WebSocketImpl?: typeof WebSocket
 }
 
-/** Connects, and stays connected for as long as the app runs. */
+/** Connects, and stays connected until it is closed. */
 export const createResilientSocket = ({
   url,
   onOpen,
@@ -54,6 +54,8 @@ export const createResilientSocket = ({
 }: ResilientSocketOptions) => {
   let socket: WebSocket | undefined
   let silence: ReturnType<typeof setTimeout> | undefined
+  let retry: ReturnType<typeof setTimeout> | undefined
+  let closed = false
   let attempt = 0
   let live = false
 
@@ -68,8 +70,8 @@ export const createResilientSocket = ({
     silence = setTimeout(abandon, silenceLimitMs())
   }
 
-  /** Lets go of the current connection, whatever state it is in, and replaces it. */
-  const abandon = () => {
+  /** Lets go of the current connection, whatever state it is in. */
+  const letGo = () => {
     clearTimeout(silence)
 
     if (socket) {
@@ -79,12 +81,17 @@ export const createResilientSocket = ({
     }
 
     setLive(false)
+  }
 
-    setTimeout(connect, reconnectDelay(attempt))
+  /** Lets go of the current connection and replaces it. */
+  const abandon = () => {
+    letGo()
+    retry = setTimeout(connect, reconnectDelay(attempt))
     attempt++
   }
 
   const connect = () => {
+    if (closed) return
     let current: WebSocket
     try {
       current = new WebSocketImpl(url)
@@ -114,4 +121,13 @@ export const createResilientSocket = ({
   }
 
   connect()
+
+  return {
+    /** Closes the connection for good: nothing is passed on or reconnected after this. */
+    close: () => {
+      closed = true
+      clearTimeout(retry)
+      letGo()
+    }
+  }
 }

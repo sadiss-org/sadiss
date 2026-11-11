@@ -14,7 +14,7 @@
  * languages announces exactly that.
  */
 
-import { ClientInfoMessage, MeasureMessage } from '../types'
+import { ClientInfoMessage, DeviceIdentity, MeasureMessage, PhoneReport } from '../types'
 import { logger } from '../tools'
 
 /** Client → server: an operator's interface asking to follow a performance. */
@@ -33,10 +33,34 @@ const isFrame = (value: unknown): value is Frame => typeof value === 'object' &&
 const isTtsLang = (value: unknown): value is { iso: string; lang: string } =>
   isFrame(value) && typeof value.iso === 'string' && typeof value.lang === 'string'
 
-const isOptional = (value: unknown, is: (candidate: unknown) => boolean) => value === undefined || is(value)
+const isOptional = <T>(value: unknown, is: (candidate: unknown) => candidate is T): value is T | undefined =>
+  value === undefined || is(value)
 
-const isString = (value: unknown) => typeof value === 'string'
-const isNumber = (value: unknown) => typeof value === 'number'
+const isString = (value: unknown): value is string => typeof value === 'string'
+const isNumber = (value: unknown): value is number => typeof value === 'number'
+
+/** The longest a field of a phone's identity may be; a longer one is not a real identity. */
+const MAX_DEVICE_TEXT = 100
+
+const isDeviceText = (value: unknown): value is string => isString(value) && value.length <= MAX_DEVICE_TEXT
+
+/** A phone's identity, or nothing when any field is missing, not a string, or longer than a real one. */
+const readDevice = (value: unknown): DeviceIdentity | undefined => {
+  if (!isFrame(value)) return undefined
+  const { id, appVersion, appBuild, platform, osVersion, model, network } = value
+  if (
+    isDeviceText(id) &&
+    isDeviceText(appVersion) &&
+    isDeviceText(appBuild) &&
+    isDeviceText(platform) &&
+    isDeviceText(osVersion) &&
+    isDeviceText(model) &&
+    isDeviceText(network)
+  ) {
+    return { id, appVersion, appBuild, platform, osVersion, model, network }
+  }
+  return undefined
+}
 
 const readClientInfo = (frame: Frame): ClientInfoMessage | undefined => {
   if (
@@ -48,31 +72,89 @@ const readClientInfo = (frame: Frame): ClientInfoMessage | undefined => {
     return undefined
   }
 
+  // Only the log reads it, so a malformed one costs the log that detail, never the registration.
+  const device = readDevice(frame.device)
+
   return {
     message: 'clientInfo',
-    clientId: frame.clientId as number,
+    clientId: frame.clientId,
     ttsLang: frame.ttsLang,
-    performanceId: frame.performanceId as string,
-    protocolVersion: frame.protocolVersion as number | undefined
+    performanceId: frame.performanceId,
+    protocolVersion: frame.protocolVersion,
+    ...(device && { device })
   }
 }
 
-const readMeasure = (frame: Frame): MeasureMessage | undefined =>
-  isNumber(frame.t0) ? { message: 'measure', t0: frame.t0 as number } : undefined
+/** The longest text a report keeps, such as an audio context's state; anything longer is read as unknown. */
+const MAX_REPORT_TEXT = 40
+
+const numberOrNull = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null)
+const booleanOrNull = (value: unknown) => (typeof value === 'boolean' ? value : null)
+const textOrNull = (value: unknown) => (typeof value === 'string' && value.length <= MAX_REPORT_TEXT ? value : null)
+
+/** A part of a report read with `read`, or null when the phone sent no object for it. */
+const partOrNull = <T>(value: unknown, read: (part: Frame) => T): T | null => (isFrame(value) ? read(value) : null)
+
+/**
+ * A phone's report, rebuilt figure by figure: a figure of the wrong kind is read
+ * as unknown rather than costing the rest. Nothing when it is not an object.
+ */
+const readPhoneReport = (value: unknown): PhoneReport | undefined => {
+  if (!isFrame(value)) return undefined
+  return {
+    clock: partOrNull(value.clock, (clock) => ({
+      offsetMs: numberOrNull(clock.offsetMs),
+      rttMs: numberOrNull(clock.rttMs),
+      roundTrips: numberOrNull(clock.roundTrips),
+      connectedForMs: numberOrNull(clock.connectedForMs)
+    })),
+    audio: partOrNull(value.audio, (audio) => ({
+      scheduleOffsetS: numberOrNull(audio.scheduleOffsetS),
+      calibrationS: numberOrNull(audio.calibrationS),
+      state: textOrNull(audio.state),
+      outputLatency: numberOrNull(audio.outputLatency),
+      baseLatency: numberOrNull(audio.baseLatency),
+      sampleRate: numberOrNull(audio.sampleRate),
+      outputTimestamp: partOrNull(audio.outputTimestamp, (stamp) => ({
+        contextTime: numberOrNull(stamp.contextTime),
+        performanceTime: numberOrNull(stamp.performanceTime)
+      }))
+    })),
+    visible: booleanOrNull(value.visible),
+    keepAlivePlaying: booleanOrNull(value.keepAlivePlaying),
+    lastChunk: partOrNull(value.lastChunk, (chunk) => ({ index: numberOrNull(chunk.index), leadMs: numberOrNull(chunk.leadMs) }))
+  }
+}
+
+const readMeasure = (frame: Frame): MeasureMessage | undefined => {
+  if (!isNumber(frame.t0)) return undefined
+  // Only the log reads the report; the ping is the shared clock and is answered whatever the report holds.
+  const report = readPhoneReport(frame.report)
+  return { message: 'measure', t0: frame.t0, ...(report && { report }) }
+}
 
 const readAdminRegistration = (frame: Frame): AdminRegistrationMessage | undefined =>
   isOptional(frame.performanceId, isString)
-    ? { message: 'isAdmin', performanceId: frame.performanceId as string | undefined }
+    ? { message: 'isAdmin', performanceId: frame.performanceId }
     : undefined
 
-const readers: { [type: string]: (frame: Frame) => InboundMessage | undefined } = {
-  clientInfo: readClientInfo,
-  measure: readMeasure,
-  isAdmin: readAdminRegistration
-}
+// A Map, so a type sent by a client finds only these readers, never a property
+// every object inherits, such as __proto__ or valueOf.
+const readers = new Map<string, (frame: Frame) => InboundMessage | undefined>([
+  ['clientInfo', readClientInfo],
+  ['measure', readMeasure],
+  ['isAdmin', readAdminRegistration]
+])
 
-/** One of our messages, or nothing at all. Nothing is returned rather than thrown. */
-export const readInboundMessage = (raw: string): InboundMessage | undefined => {
+/**
+ * One of our messages, or nothing at all. Nothing is returned rather than thrown.
+ * `onMalformed` hears the type of a message we accept that arrived in a shape we
+ * cannot read.
+ */
+export const readInboundMessage = (
+  raw: string,
+  onMalformed: (message: string) => void = () => undefined
+): InboundMessage | undefined => {
   let parsed: unknown
 
   try {
@@ -87,7 +169,7 @@ export const readInboundMessage = (raw: string): InboundMessage | undefined => {
     return undefined
   }
 
-  const read = readers[parsed.message as string]
+  const read = readers.get(parsed.message)
   if (!read) {
     logger.debug(`Ignored a message of an unknown type: ${parsed.message}`)
     return undefined
@@ -96,6 +178,7 @@ export const readInboundMessage = (raw: string): InboundMessage | undefined => {
   const message = read(parsed)
   if (!message) {
     logger.warn(`Discarded a malformed ${parsed.message} message: ${raw.slice(0, 200)}`)
+    onMalformed(parsed.message)
   }
 
   return message

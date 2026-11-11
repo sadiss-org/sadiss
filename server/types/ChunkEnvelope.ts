@@ -1,0 +1,24 @@
+import { PartialChunk } from './PartialChunk'
+
+/** How much of a track one chunk carries, in seconds; a session sends one chunk per this much time. */
+export const CHUNK_SECONDS = 1
+
+/** The audio and speech a device is given for one chunk. */
+export interface Chunk {
+  partials?: PartialChunk[]
+  ttsInstructions?: { time: number; phrase: string }
+}
+
+/**
+ * One chunk's message to one device, as it goes over the wire. `startTime` is
+ * the server time, in seconds, that the track's time 0 is scheduled at; every
+ * time inside `chunk` is track time.
+ *
+ * Released apps parse this shape, so it only ever grows.
+ */
+export interface ChunkEnvelope {
+  startTime: number
+  waveform: string
+  ttsRate: number
+  chunk: Chunk
+}

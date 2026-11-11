@@ -3,6 +3,9 @@ import jwt from 'jsonwebtoken'
 import { User } from '../models/user'
 import { NotFoundError } from '../errors'
 
+/** How a password is stored. Logging in checks it with bcryptjs in `auth.ts` and in `authenticateUser`. */
+export const hashPassword = (password: string) => bcrypt.hash(password, 10)
+
 export const authenticateUser = async (email: string, password: string) => {
   const user = await User.findOne({ email })
 

@@ -1,13 +1,19 @@
+/** The audio and speech one chunk gives this phone, as the server sends it (server/types/ChunkEnvelope.ts). */
 export interface Chunk {
-  partials: Partial[]
-  ttsInstruction: ClientTtsInstruction
+  partials?: PartialChunk[]
+  ttsInstructions?: { time: number; phrase: string }
 }
 
-export interface Partial {
-  index: number
+/**
+ * One chunk's message to this phone, as it comes over the wire. `startTime` is
+ * the server time, in seconds, that the track's time 0 is scheduled at; every
+ * time inside `chunk` is track time.
+ */
+export interface ChunkEnvelope {
   startTime: number
-  endTime: number
-  breakpoints: Breakpoint[]
+  waveform: string
+  ttsRate: number
+  chunk: Chunk
 }
 
 export interface PartialChunk {

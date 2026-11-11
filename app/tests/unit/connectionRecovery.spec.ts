@@ -13,7 +13,14 @@ vi.mock('@/composables/usePlayer', () => ({
 }))
 
 vi.mock('@/composables/useClockMeasurement', () => ({
-  useClockMeasurement: () => ({ start: vi.fn(), handleMessage: () => false, intervalMs: () => 3000 })
+  useClockMeasurement: () => ({
+    clock: { estimate: () => null },
+    now: () => 0,
+    start: vi.fn(),
+    handleMessage: () => false,
+    intervalMs: () => 3000,
+    stop: vi.fn()
+  })
 }))
 
 /** A fresh copy of the connection module, so no test inherits another's state. */

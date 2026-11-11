@@ -1,4 +1,5 @@
-import { Frame, PartialChunk, TrackSettings } from './types'
+import { Frame, TrackSettings } from './types'
+import { Chunk, ChunkEnvelope } from './types/ChunkEnvelope'
 import { Recipient } from './lib/audience'
 import { distributePartials, PartialMap } from './partialDistribution'
 
@@ -13,12 +14,6 @@ const MAX_PARTIALS_PER_CLIENT = 16
  * emit deliberately different shapes and both are pinned by tests.
  */
 
-/** The audio and speech a device is given for one chunk. */
-interface Chunk {
-  partials?: PartialChunk[]
-  ttsInstructions?: { time: number; phrase: string }
-}
-
 /** One device's message for one chunk, already serialised. */
 export interface DeviceMessage {
   device: Recipient
@@ -30,15 +25,14 @@ export interface ChunkPayloads {
   messages: DeviceMessage[]
   /** The partial assignment to carry into the next chunk. */
   nextMap: PartialMap
+  /** How many of the frame's partials no device was given. */
+  unassignedPartials: number
 }
 
-const envelope = (chunk: Chunk, playAt: number, settings: TrackSettings) =>
-  JSON.stringify({
-    startTime: playAt,
-    waveform: settings.waveform,
-    ttsRate: settings.ttsRate,
-    chunk
-  })
+const envelope = (chunk: Chunk, playAt: number, settings: TrackSettings) => {
+  const message: ChunkEnvelope = { startTime: playAt, waveform: settings.waveform, ttsRate: settings.ttsRate, chunk }
+  return JSON.stringify(message)
+}
 
 /**
  * Choir mode: a device plays the partial whose index is its choir id, and hears
@@ -107,7 +101,10 @@ const nonChoirPayloads = (
     }
   }
 
-  return { messages, nextMap }
+  // Over what the devices can take: left out of the assignment, or kept in it with nobody.
+  const unassignedPartials = (frame.partials ?? []).filter((partial) => !nextMap[partial.index]?.length).length
+
+  return { messages, nextMap, unassignedPartials }
 }
 
 /**
@@ -123,5 +120,9 @@ export const payloadsForChunk = (
   previousMap: PartialMap
 ): ChunkPayloads =>
   settings.mode === 'choir'
-    ? { messages: choirPayloads(frame, devices, playAt, settings), nextMap: previousMap }
+    ? {
+        messages: choirPayloads(frame, devices, playAt, settings),
+        nextMap: previousMap,
+        unassignedPartials: frame.partials.filter((partial) => !devices.some((device) => device.choirId === partial.index)).length
+      }
     : nonChoirPayloads(frame, devices, playAt, settings, previousMap)

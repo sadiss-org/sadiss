@@ -14,7 +14,41 @@ vi.mock('@/composables/usePlayer', () => ({
 }))
 
 vi.mock('@/composables/useClockMeasurement', () => ({
-  useClockMeasurement: () => ({ start: vi.fn(), handleMessage: () => false, intervalMs: () => 3000 })
+  useClockMeasurement: () => ({
+    clock: { estimate: () => null },
+    now: () => 0,
+    start: vi.fn(),
+    handleMessage: () => false,
+    intervalMs: () => 3000,
+    stop: vi.fn()
+  })
+}))
+
+vi.mock('@capacitor/preferences', () => {
+  const stored = new Map<string, string>()
+  return {
+    Preferences: {
+      get: async ({ key }: { key: string }) => ({ value: stored.get(key) ?? null }),
+      set: async ({ key, value }: { key: string; value: string }) => {
+        stored.set(key, value)
+      }
+    }
+  }
+})
+
+vi.mock('@capacitor/device', () => ({
+  Device: { getInfo: async () => ({ platform: 'android', osVersion: '13', model: 'MAR-LX1A' }) }
+}))
+
+vi.mock('@capacitor/app', () => ({
+  App: { getInfo: async () => ({ build: '12' }) }
+}))
+
+vi.mock('@capacitor/network', () => ({
+  Network: {
+    getStatus: async () => ({ connected: true, connectionType: 'wifi' }),
+    addListener: async () => ({ remove: async () => undefined })
+  }
 }))
 
 createTestingPinia({ stubActions: false })
@@ -44,7 +78,16 @@ describe('clientInfo handshake', () => {
       clientId: 3,
       ttsLang: { iso: 'en-US', lang: 'English' },
       performanceId: 'performance-1',
-      protocolVersion: PROTOCOL_VERSION
+      protocolVersion: PROTOCOL_VERSION,
+      device: {
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        appVersion: import.meta.env.VITE_APP_VERSION,
+        appBuild: '12',
+        platform: 'android',
+        osVersion: '13',
+        model: 'MAR-LX1A',
+        network: 'wifi'
+      }
     })
   })
 
