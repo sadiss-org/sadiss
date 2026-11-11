@@ -36,12 +36,16 @@ describe('a playback session writing to a log that never drains', () => {
     expect(session.isRunning()).toBe(false)
 
     stream.emit('drain')
+    // Every line after the start was lost: a chunk record for each of the three chunks, and the end.
     expect(stream.records().map(({ type, count }) => ({ type, count }))).toEqual([
       { type: 'start', count: undefined },
-      { type: 'dropped', count: 1 }
+      { type: 'dropped', count: 4 }
     ])
   })
 })
+
+/** A run's records about the run itself; chunk records have tests of their own (chunkRecords.spec.ts). */
+const withoutChunks = <R extends { type: string }>(records: R[]) => records.filter((record) => record.type !== 'chunk')
 
 describe('what a playback session records', () => {
   beforeEach(() => {
@@ -62,7 +66,7 @@ describe('what a playback session records', () => {
       ttsRate: 1
     })
     session.start(100, () => [], logTo(stream))
-    return { session, records: () => stream.lines.map((line) => JSON.parse(line)) }
+    return { session, records: () => withoutChunks(stream.lines.map((line) => JSON.parse(line))) }
   }
 
   it('a start, and that the track ran out once it has', () => {
@@ -126,7 +130,11 @@ describe('what a playback session records', () => {
       waveform: 'sine',
       ttsRate: 1
     })
-    session.start(100, () => [phone], { write: (record) => timeline.push(`recorded ${record.type}`) })
+    session.start(100, () => [phone], {
+      write: (record) => {
+        if (record.type !== 'chunk') timeline.push(`recorded ${record.type}`)
+      }
+    })
 
     vi.advanceTimersByTime(1000)
     session.stop()
@@ -164,7 +172,7 @@ describe('what a playback session records', () => {
     second.start(100, () => [phone], log)
     vi.advanceTimersByTime(600)
 
-    expect(stream.records().map(({ type, trackId }) => `${type} ${trackId}`)).toEqual([
+    expect(withoutChunks(stream.records()).map(({ type, trackId }) => `${type} ${trackId}`)).toEqual([
       'start first',
       'stop first',
       'start second'

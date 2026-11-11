@@ -134,26 +134,34 @@ export class PlaybackSession {
     let rounds = 0
 
     /**
-     * Sends the current chunk. It runs from a timer, where nothing above catches
-     * what it throws, so a chunk that cannot be sent is logged and costs only
-     * itself: the next one is sent on time.
+     * Sends the current chunk, and says how many devices it went to, how many of
+     * its partials none was given, and how long sending took. It runs from a
+     * timer, where nothing above catches what it throws, so a chunk that cannot
+     * be sent is logged and costs only itself: the next one is sent on time.
      */
     const sendChunk = (devices: Recipient[]) => {
       const currentFrame = this.frames[chunkIndex]
-      if (!currentFrame) {
-        return
-      }
+      if (!currentFrame) return undefined
 
       try {
-        const { messages, nextMap } = payloadsForChunk(currentFrame, devices, chunkDate(), this.settings, partialMap)
+        const startedAt = performance.now()
+        const { messages, nextMap, unassignedPartials } = payloadsForChunk(
+          currentFrame,
+          devices,
+          chunkDate(),
+          this.settings,
+          partialMap
+        )
 
         for (const { device, json } of messages) {
           device.send(json)
         }
 
         partialMap = nextMap
+        return { devices: messages.length, unassignedPartials, sendMs: performance.now() - startedAt }
       } catch (err) {
         logger.error(`Performing ${this.performanceKey}: skipped chunk ${chunkIndex}, which could not be sent: ${reasonOf(err)}`)
+        return undefined
       }
     }
 
@@ -173,13 +181,18 @@ export class PlaybackSession {
       const dt = Date.now() - expected
       const devices = audienceNow()
 
+      let sent: ReturnType<typeof sendChunk>
       if (devices.length) {
-        sendChunk(devices)
+        sent = sendChunk(devices)
       } else {
         logger.info('No clients to distribute to.')
+        sent = { devices: 0, unassignedPartials: this.frames[chunkIndex]?.partials.length ?? 0, sendMs: 0 }
       }
 
       for (; rounds > 0; rounds--) log.write({ type: 'loop', trackId: this.trackId })
+      if (sent) {
+        log.write({ type: 'chunk', index: chunkIndex, lateMs: dt, ...sent, sendMs: Math.round(sent.sendMs * 10) / 10 })
+      }
 
       this.sentChunk = chunkIndex
       chunkIndex++

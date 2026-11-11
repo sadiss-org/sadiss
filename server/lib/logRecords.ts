@@ -22,6 +22,12 @@ export type PerformanceRecord =
   | { type: 'stop'; trackId: string }
   /** A looping track ran past its end and began again. */
   | { type: 'loop'; trackId: string }
+  /**
+   * A chunk went out: how late against the schedule sending it started, how long
+   * sending it to every device took, to how many devices, and how many of its
+   * partials no device was given.
+   */
+  | { type: 'chunk'; index: number; lateMs: number; sendMs: number; devices: number; unassignedPartials: number }
   /** A track that does not loop ran out. */
   | { type: 'ended'; trackId: string }
   /** Lines before this one were lost because they could not be written; written by the log itself. */
@@ -35,6 +41,20 @@ export type PerformanceRecord =
 export type ServerRecord =
   /** A socket opened. */
   | { type: 'connect'; connection: string }
+  /**
+   * How loaded the server was since the sample before (lib/serverHealth.ts): how
+   * far past schedule its event loop ran timers on average and at most, its CPU
+   * as a percent of one core, its memory, and the sockets open now.
+   */
+  | {
+      type: 'health'
+      eventLoopMeanMs: number
+      eventLoopMaxMs: number
+      cpuPct: number
+      heapUsedMb: number
+      rssMb: number
+      sockets: number
+    }
   /**
    * What a connection recorded while its records went to no performance's file:
    * one that never registered, an admin, or a device whose performance does not

@@ -14,7 +14,6 @@ const MAX_PARTIALS_PER_CLIENT = 16
  * emit deliberately different shapes and both are pinned by tests.
  */
 
-
 /** One device's message for one chunk, already serialised. */
 export interface DeviceMessage {
   device: Recipient
@@ -26,6 +25,8 @@ export interface ChunkPayloads {
   messages: DeviceMessage[]
   /** The partial assignment to carry into the next chunk. */
   nextMap: PartialMap
+  /** How many of the frame's partials no device was given. */
+  unassignedPartials: number
 }
 
 const envelope = (chunk: Chunk, playAt: number, settings: TrackSettings) => {
@@ -100,7 +101,10 @@ const nonChoirPayloads = (
     }
   }
 
-  return { messages, nextMap }
+  // Over what the devices can take: left out of the assignment, or kept in it with nobody.
+  const unassignedPartials = (frame.partials ?? []).filter((partial) => !nextMap[partial.index]?.length).length
+
+  return { messages, nextMap, unassignedPartials }
 }
 
 /**
@@ -116,5 +120,9 @@ export const payloadsForChunk = (
   previousMap: PartialMap
 ): ChunkPayloads =>
   settings.mode === 'choir'
-    ? { messages: choirPayloads(frame, devices, playAt, settings), nextMap: previousMap }
+    ? {
+        messages: choirPayloads(frame, devices, playAt, settings),
+        nextMap: previousMap,
+        unassignedPartials: frame.partials.filter((partial) => !devices.some((device) => device.choirId === partial.index)).length
+      }
     : nonChoirPayloads(frame, devices, playAt, settings, previousMap)
