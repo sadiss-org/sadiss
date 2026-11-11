@@ -17,6 +17,7 @@ import {
 } from './Measurement'
 import {
   ClientInfoMessage,
+  DeviceIdentity,
   CURRENT_PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
   UNVERSIONED_PROTOCOL_VERSION,
@@ -40,6 +41,7 @@ export {
   MeasureResponseMessage,
   MeasureConfigMessage,
   ClientInfoMessage,
+  DeviceIdentity,
   CURRENT_PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
   UNVERSIONED_PROTOCOL_VERSION,

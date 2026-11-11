@@ -1,5 +1,5 @@
 import WebSocket from 'ws'
-import { ConnectionRecord, PerformanceLog, PerformanceRecord, ServerLog } from '../lib/logRecords'
+import { ConnectionRecord, PerformanceLog, Register, ServerLog } from '../lib/logRecords'
 import { performanceOfDevice } from '../lib/audience'
 import { SadissWebSocket } from '../lib/SadissWebsocket'
 import { logger, reasonOf } from '../tools'
@@ -29,7 +29,7 @@ export interface LogFiles {
 /** What the log reads off a socket. */
 export type Connection = Pick<
   SadissWebSocket,
-  'id' | 'readyState' | 'performanceId' | 'isAdmin' | 'openedAt' | 'choirId' | 'ttsLang' | 'protocolVersion'
+  'id' | 'readyState' | 'performanceId' | 'isAdmin' | 'openedAt' | 'choirId' | 'ttsLang' | 'protocolVersion' | 'device'
 >
 
 /** A connection record as a caller gives it: the log adds whose connection it is. */
@@ -96,13 +96,14 @@ export const createConnectionLog = (files: LogFiles, performanceExists: Performa
     if (!performanceId) return
 
     // What the device said now, not what a later clientInfo says by the time the answer comes.
-    const record: Extract<PerformanceRecord, { type: 'register' }> = {
+    const record: Register = {
       type: 'register',
       connection: client.id,
       openedAt: client.openedAt,
       choirId: client.choirId,
       ttsLang: client.ttsLang,
-      protocolVersion: client.protocolVersion
+      protocolVersion: client.protocolVersion,
+      ...(client.device ? { device: client.device } : { unidentified: true })
     }
 
     const exists = await lookUp(logging, performanceId)

@@ -124,6 +124,7 @@ const registerDevice = (client: SadissWebSocket, clientInfo: ClientInfoMessage) 
   client.ttsLang = clientInfo.ttsLang
   client.performanceId = clientInfo.performanceId
   client.protocolVersion = readProtocolVersion(clientInfo)
+  client.device = clientInfo.device
 
   logger.info(
     `Performance ${client.performanceId}: Client ${client.id} registered with choir id ${client.choirId}, TTS lang ${client.ttsLang.iso} and protocol version ${client.protocolVersion}`

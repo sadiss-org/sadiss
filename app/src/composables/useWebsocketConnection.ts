@@ -5,6 +5,7 @@ import { useClockMeasurement } from './useClockMeasurement'
 import { Capacitor } from '@capacitor/core'
 import { connectDevice } from './deviceConnection'
 import { iosSpeechRate } from './iosSpeechRate'
+import { loadDeviceIdentity } from './deviceIdentity'
 
 const { handleChunkData, setOffset, stopPlayback, setStartTime, setTrackSettings } = usePlayer()
 const measurement = useClockMeasurement()
@@ -25,13 +26,15 @@ export function useWebsocketConnection() {
       await new Promise((resolve) => setTimeout(resolve, 10))
     }
     console.log('ws url: ', mainStore.wsUrl)
+    const identity = await loadDeviceIdentity()
 
     connectDevice({
       url: mainStore.wsUrl,
       clientInfo: () => ({
         clientId: mainStore.choirId,
         ttsLang: mainStore.selectedLanguage,
-        performanceId: mainStore.performanceId
+        performanceId: mainStore.performanceId,
+        device: identity()
       }),
       clockSync: measurement,
       onPlayback: handlePlayback,
