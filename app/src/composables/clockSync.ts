@@ -1,12 +1,17 @@
 import { createMeasurementController, isInboundMeasurementMessage, MeasurementController } from './measurementController'
 import { roundTripRtt, ServerClock } from './serverClock'
-import { MeasureMessage } from '@/types/measurement'
+import { MeasureMessage, PhoneReport } from '@/types/measurement'
 
 export interface ClockSync {
   /** The phone's estimate of the server clock. */
   clock: ServerClock
-  /** Begins clock sync over a connection, replacing any earlier one. */
-  start(send: (message: MeasureMessage) => void): void
+  /** The phone's own clock the estimate is measured against, in ms. */
+  now(): number
+  /**
+   * Begins clock sync over a connection, replacing any earlier one. `report`
+   * gives the phone's state, sent with each ping while the server asks for it.
+   */
+  start(send: (message: MeasureMessage) => void, report?: () => PhoneReport): void
   /**
    * Routes an inbound socket payload. Returns true if it was a clock-sync
    * message (and was handled), so the caller can skip its own processing.
@@ -57,10 +62,12 @@ export const createClockSync = ({
 
   return {
     clock,
-    start: (send) => {
+    now,
+    start: (send, report) => {
       controller = createMeasurementController({
         now,
         send,
+        report,
         onRoundTrip: (roundTrip) => {
           clock.add(roundTrip)
           onRoundTrip?.(roundTripRtt(roundTrip))

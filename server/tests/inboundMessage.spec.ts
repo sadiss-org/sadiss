@@ -131,6 +131,55 @@ describe('reading a frame as one of our messages', () => {
 
     // Without t0 the round trip tells the device nothing, so there is no point
     // stamping and echoing it.
+    const report = {
+      clock: { offsetMs: 12.5, rttMs: 30, roundTrips: 20, connectedForMs: 60000 },
+      audio: {
+        scheduleOffsetS: 1794334.2,
+        calibrationS: 0.12,
+        state: 'running',
+        outputLatency: 0.04,
+        baseLatency: 0.005,
+        sampleRate: 48000,
+        outputTimestamp: { contextTime: 12.3, performanceTime: 45678.9 }
+      },
+      visible: false,
+      keepAlivePlaying: true,
+      lastChunk: { index: 7, leadMs: 912.4 }
+    }
+
+    it('keeps the report a phone sends with it', () => {
+      expect(read({ message: 'measure', t0: 5, report })).toEqual({ message: 'measure', t0: 5, report })
+    })
+
+    it('keeps a report whose figures the phone could not give', () => {
+      const unknown = { clock: null, audio: null, visible: null, keepAlivePlaying: null, lastChunk: null }
+      expect(read({ message: 'measure', t0: 5, report: unknown })).toEqual({ message: 'measure', t0: 5, report: unknown })
+    })
+
+    // The report only goes into the log; the ping is the shared clock and must always be answered.
+    it('reads a figure of the wrong kind as unknown, and drops keys it does not expect', () => {
+      const parsed = read({
+        message: 'measure',
+        t0: 5,
+        report: {
+          ...report,
+          visible: 'yes',
+          clock: { ...report.clock, rttMs: '30' },
+          audio: { ...report.audio, state: 'x'.repeat(500) },
+          extra: 1
+        }
+      })
+      expect(parsed).toMatchObject({
+        t0: 5,
+        report: { visible: null, clock: { rttMs: null, offsetMs: 12.5 }, audio: { state: null } }
+      })
+      expect(parsed).not.toHaveProperty('report.extra')
+    })
+
+    it('answers a ping whose report is not an object, without the report', () => {
+      expect(read({ message: 'measure', t0: 5, report: 'broken' })).toEqual({ message: 'measure', t0: 5 })
+    })
+
     it('discards one with no send stamp', () => {
       expect(read({ message: 'measure' })).toBeUndefined()
     })

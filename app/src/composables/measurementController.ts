@@ -1,4 +1,4 @@
-import { InboundMeasurementMessage, MeasurementConfig, MeasureMessage } from '@/types/measurement'
+import { InboundMeasurementMessage, MeasurementConfig, MeasureMessage, PhoneReport } from '@/types/measurement'
 import { RoundTrip } from './serverClock'
 
 /**
@@ -12,6 +12,8 @@ export interface MeasurementControllerDeps {
   send(message: MeasureMessage): void
   /** Called with each completed round trip, so the clock can update from it. */
   onRoundTrip?(roundTrip: RoundTrip): void
+  /** The phone's state, sent with each ping while the server asks for it. */
+  report?(): PhoneReport
 }
 
 export interface MeasurementController {
@@ -31,13 +33,29 @@ export interface MeasurementController {
 export const isInboundMeasurementMessage = (payload: { message?: unknown }): payload is InboundMeasurementMessage =>
   payload.message === 'measureConfig' || payload.message === 'measureResponse'
 
+/** The report to send with a ping, or nothing when it cannot be made: the ping is the clock and must go out. */
+const reportOrNothing = (report: (() => PhoneReport) | undefined): { report?: PhoneReport } => {
+  if (!report) return {}
+  try {
+    return { report: report() }
+  } catch (err) {
+    console.warn('Could not make the phone report:', err)
+    return {}
+  }
+}
+
 /**
  * Drives the device side of clock sync: pings the server and turns each
  * response into a completed round trip for the ServerClock. It performs no
  * estimation itself — the clock owns that. Cadence comes from the server via
  * `measureConfig`, so it is tunable without an app rebuild.
  */
-export const createMeasurementController = ({ now, send, onRoundTrip }: MeasurementControllerDeps): MeasurementController => {
+export const createMeasurementController = ({
+  now,
+  send,
+  onRoundTrip,
+  report
+}: MeasurementControllerDeps): MeasurementController => {
   let config: MeasurementConfig = { intervalMs: 0 }
 
   return {
@@ -50,7 +68,9 @@ export const createMeasurementController = ({ now, send, onRoundTrip }: Measurem
     },
 
     ping() {
-      send({ message: 'measure', t0: now() })
+      // Made before the stamp, so making it does not count toward the round trip.
+      const extra = config.report ? reportOrNothing(report) : {}
+      send({ message: 'measure', t0: now(), ...extra })
     },
 
     handleMessage(message) {

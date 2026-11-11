@@ -1,18 +1,28 @@
 import { connectDevice } from '@/composables/deviceConnection'
 import { PROTOCOL_VERSION } from '@/composables/protocol'
 import { FakeWebSocket, latestSocket } from './fakeWebSocket'
+import { PhoneReport } from '@/types/measurement'
+import { DeviceConnectionOptions, DeviceState } from '@/composables/deviceConnection'
 
 /**
  * The connection a phone keeps to the server, with the clock sync and the
  * playback stood in for, so only what the connection itself does is tested.
  */
 
-const connect = (intervalMs = 3000) => {
+const connect = (
+  intervalMs = 3000,
+  extra: { deviceState?: () => DeviceState; onChunk?: DeviceConnectionOptions['onChunk'] } = {},
+  now = () => 0
+) => {
   const playback: unknown[] = []
   const calls: string[] = []
+  let report: (() => PhoneReport) | undefined
   const clockSync = {
-    start: vi.fn((send: (message: { message: 'measure'; t0: number }) => void) => {
+    clock: { estimate: () => ({ offsetMs: 5000, rttMs: 30, roundTrips: 4 }) },
+    now: () => now(),
+    start: vi.fn((send: (message: { message: 'measure'; t0: number }) => void, reportFor?: () => PhoneReport) => {
       calls.push('clock started')
+      report = reportFor
       send({ message: 'measure', t0: 1 })
     }),
     handleMessage: vi.fn((payload: { message?: unknown }) => payload.message === 'measureResponse'),
@@ -25,9 +35,10 @@ const connect = (intervalMs = 3000) => {
     clockSync,
     onPlayback: (message) => playback.push(message),
     onLiveChange: () => undefined,
-    WebSocketImpl: FakeWebSocket as unknown as typeof WebSocket
+    WebSocketImpl: FakeWebSocket as unknown as typeof WebSocket,
+    ...extra
   })
-  return { connection, clockSync, playback, calls }
+  return { connection, clockSync, playback, calls, report: () => report?.() }
 }
 
 beforeEach(() => {
@@ -101,5 +112,76 @@ describe('the connection a phone keeps to the server', () => {
 
     expect(FakeWebSocket.opened).toHaveLength(1)
     expect(clockSync.stop).toHaveBeenCalled()
+  })
+
+  it('reports how well the phone keeps time, how long it has been connected and how early the last chunk came', () => {
+    let now = 1000
+    const { report } = connect(3000, {}, () => now)
+    latestSocket().open()
+    now = 4000
+    // Sounds at server time 10 s; the phone is 5 s behind the server, so at its 4 s it is server time 9 s.
+    latestSocket().receive(
+      JSON.stringify({
+        startTime: 7,
+        waveform: 'sine',
+        ttsRate: 1,
+        chunk: { partials: [{ index: 0, startTime: 3, endTime: 4, breakpoints: [] }] }
+      })
+    )
+    // A chunk with only a phrase does not replace it.
+    latestSocket().receive(
+      JSON.stringify({ startTime: 7, waveform: 'sine', ttsRate: 1, chunk: { ttsInstructions: { time: 4, phrase: 'hallo' } } })
+    )
+    now = 6000
+
+    expect(report()).toEqual({
+      clock: { offsetMs: 5000, rttMs: 30, roundTrips: 4, connectedForMs: 5000 },
+      audio: null,
+      visible: null,
+      keepAlivePlaying: null,
+      lastChunk: { index: 3, leadMs: 1000 }
+    })
+  })
+
+  it('adds what the app knows about its audio and screen to the report', () => {
+    const state: DeviceState = { audio: null, visible: false, keepAlivePlaying: true }
+    const { report } = connect(3000, { deviceState: () => state })
+    latestSocket().open()
+
+    expect(report()).toMatchObject({ visible: false, keepAlivePlaying: true, lastChunk: null })
+  })
+
+  it('still plays a chunk whose timing cannot be read', () => {
+    const { playback, report } = connect()
+    latestSocket().open()
+    const malformed = { startTime: 7, waveform: 'sine', ttsRate: 1, chunk: { partials: 'not a list' } }
+
+    latestSocket().receive(JSON.stringify(malformed))
+
+    expect(playback).toEqual([malformed])
+    expect(report()).toMatchObject({ lastChunk: null })
+  })
+
+  it('hands every chunk on with how early it came, for the load test to keep', () => {
+    const chunks: unknown[] = []
+    connect(3000, { onChunk: (message, arrival) => chunks.push([message.chunk, arrival]) }, () => 4000)
+    latestSocket().open()
+
+    latestSocket().receive(
+      JSON.stringify({
+        startTime: 7,
+        waveform: 'sine',
+        ttsRate: 1,
+        chunk: { partials: [{ index: 0, startTime: 3, endTime: 4, breakpoints: [] }] }
+      })
+    )
+    latestSocket().receive(
+      JSON.stringify({ startTime: 7, waveform: 'sine', ttsRate: 1, chunk: { ttsInstructions: { time: 4, phrase: 'hallo' } } })
+    )
+
+    expect(chunks).toEqual([
+      [{ partials: [{ index: 0, startTime: 3, endTime: 4, breakpoints: [] }] }, { chunk: 3, leadMs: 1000 }],
+      [{ ttsInstructions: { time: 4, phrase: 'hallo' } }, null]
+    ])
   })
 })

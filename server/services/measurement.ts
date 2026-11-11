@@ -1,4 +1,5 @@
 import { createMeasurementService, systemClock } from './measurementService'
+import { performanceLogFiles } from './performanceLogFiles'
 
 /**
  * The composed, application-wide clock-sync service: real system clock, cadence
@@ -10,5 +11,7 @@ const intervalMs = Number(process.env.MEASUREMENT_INTERVAL_MS) || 3000
 
 export const measurementService = createMeasurementService({
   clock: systemClock,
-  config: { intervalMs }
+  config: { intervalMs },
+  // Phones report only while there is a log to keep their reports in; PHONE_REPORTS=off stops them even then.
+  reportsWanted: () => performanceLogFiles.writing() && process.env.PHONE_REPORTS !== 'off'
 })
