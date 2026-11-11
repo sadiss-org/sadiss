@@ -103,6 +103,44 @@ updating at all.
 number change — each level brings behaviour changes that need testing on a device
 (Android 15 forcing edge-to-edge layout, for example).
 
+## Foreground service
+
+While a phone is joined to a performance, the app runs a foreground service of type
+`mediaPlayback` with a silent notification, "SADISS is playing". Without it Android
+treats a locked phone's app as cached and reclaims it a few minutes after the screen
+locks, and the phone drops out of the piece. The service and its permissions
+(`FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `POST_NOTIFICATIONS`) are
+declared by the local plugin in `app/plugins/playback-service/`.
+
+Play asks every app that targets Android 14 or later to declare its foreground
+service types. Do this once the locked-phone test has passed and before uploading
+the bundle that first contains the service:
+
+1. Film the app in use with a second phone or a camera; a screen recording goes black
+   when the screen locks. In one take: open SADISS, scan a performance QR code, the
+   track starts and sound plays, pull down the notification shade to show "SADISS is
+   playing", press the power button and let it play for about 20 seconds, unlock,
+   the phone is still joined.
+2. Upload the video to YouTube as **Unlisted**.
+3. Play Console → the app → **App content** (Google's help page puts it under
+   *Monitor and improve* → *App content*; the console may label it *Policy* →
+   *App content*) → the **foreground service** declaration.
+4. Tick the use case **Media Playback** and fill in:
+   - Description: "SADISS turns audience phones into speakers for a live
+     performance. After the user joins a performance by scanning its QR code, the
+     phone plays its part of the piece as audio streamed from the performance
+     server. The foreground service keeps that audio playing when the user locks
+     the screen or puts the phone in a pocket."
+   - Impact if deferred or interrupted: "The phone goes silent in the middle of the
+     performance and drops out of the piece; the user has to unlock the phone and
+     rejoin."
+   - The video link.
+5. Submit the declaration before uploading the bundle. Google's page does not say
+   whether a missing declaration blocks the release.
+
+Google's requirements:
+https://support.google.com/googleplay/android-developer/answer/13392821
+
 ## Developer account inactivity
 
 Google closes developer accounts that stay inactive, which takes the published apps

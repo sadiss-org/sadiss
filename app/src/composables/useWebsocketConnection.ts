@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core'
 import { connectDevice } from './deviceConnection'
 import { iosSpeechRate } from './iosSpeechRate'
 import { loadDeviceIdentity } from './deviceIdentity'
+import { stayAlive } from './stayAlive'
 
 const { handleChunkData, setOffset, stopPlayback, setStartTime, setTrackSettings, deviceState } = usePlayer()
 const measurement = useClockMeasurement()
@@ -44,6 +45,7 @@ export function useWebsocketConnection() {
       // scheduled plays out while the next one is found.
       onLiveChange: (live) => (isRegistered.value = live)
     })
+    await stayAlive()
   }
 
   return { establishWebsocketConnection, isRegistered }

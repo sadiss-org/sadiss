@@ -1,0 +1,18 @@
+{
+  "name": "@sadiss/playback-service",
+  "version": "1.0.0",
+  "description": "Keeps the SADISS app running on Android while it plays, through a mediaPlayback foreground service.",
+  "private": true,
+  "author": "Mathias",
+  "license": "MIT",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  },
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  }
+}
