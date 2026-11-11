@@ -22,6 +22,10 @@ export function useWebsocketConnection() {
   const establishWebsocketConnection = async () => {
     if (connecting) return
     connecting = true
+    // Started before any wait: Android refuses to start the service once the app
+    // is in the background, as when the screen locks. Not awaited, so the join
+    // never waits on the notification dialog.
+    void stayAlive()
     while (!mainStore.wsUrl) {
       console.log('waiting for ws url')
       await new Promise((resolve) => setTimeout(resolve, 10))
@@ -45,7 +49,6 @@ export function useWebsocketConnection() {
       // scheduled plays out while the next one is found.
       onLiveChange: (live) => (isRegistered.value = live)
     })
-    await stayAlive()
   }
 
   return { establishWebsocketConnection, isRegistered }

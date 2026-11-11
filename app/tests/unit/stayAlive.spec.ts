@@ -1,4 +1,3 @@
-import type { Mock } from 'vitest'
 import { Capacitor } from '@capacitor/core'
 import { KeepAwake } from '@capacitor-community/keep-awake'
 import { PlaybackService } from '@sadiss/playback-service'
@@ -16,9 +15,9 @@ vi.mock('@sadiss/playback-service', () => ({
   PlaybackService: { start: vi.fn() }
 }))
 
-const getPlatform = Capacitor.getPlatform as Mock
-const keepAwake = KeepAwake.keepAwake as Mock
-const startService = PlaybackService.start as Mock
+const getPlatform = vi.mocked(Capacitor.getPlatform)
+const keepAwake = vi.mocked(KeepAwake.keepAwake)
+const startService = vi.mocked(PlaybackService.start)
 
 describe('stayAlive', () => {
   beforeEach(() => {
