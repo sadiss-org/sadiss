@@ -65,7 +65,7 @@ npm install
 SADISS_ADMIN_EMAIL=loadtest@example.invalid SADISS_ADMIN_PASSWORD=<the same> npm run loadtest -- --phones 10 --seconds 30
 ```
 
-Options, with their defaults: `--api http://127.0.0.1:3000`, `--ws ws://127.0.0.1:8080`, `--phones 10`, `--seconds 30` (track length), `--partials 16` (partials per frame; in nonChoir mode the server shares them out over the phones, at most 16 each), `--voices` (choir mode with this many voices, one partial each; not together with `--partials`), `--langs` (phrases in these ISO codes, separated by commas, such as `en-US,de-DE`), `--phrase-every 4` (seconds between a voice's phrases, at least 1, since the server keeps one phrase per voice and chunk), `--join-over 5` (seconds over which the phones that join before the track do so), `--late-share 0.1` (the share of phones that join during the first half of the track), `--settle 60` (seconds the phones measure their clocks before the track starts), `--server-commit` (the commit the server under test runs, when it cannot be found; see below) and `--note` (a few words kept with the run, such as what else ran on the box). A value that is not a number is refused, and so is `--phones` below 2, or a late share that leaves fewer than 2 phones joining before the track, since the offset from the median needs at least two phones (`MIN_PHONES` in [`src/stats.ts`](src/stats.ts)).
+Options, with their defaults: `--api http://127.0.0.1:3000`, `--ws ws://127.0.0.1:8080`, `--phones 10`, `--seconds 30` (track length), `--partials 16` (partials per frame; in nonChoir mode the server shares them out over the phones, at most 16 each), `--voices` (choir mode with this many voices, one partial each; not together with `--partials`), `--langs` (phrases in these ISO codes, separated by commas, such as `en-US,de-DE`), `--phrase-every 4` (seconds between a voice's phrases, at least 1, since the server keeps one phrase per voice and chunk), `--join-over 5` (seconds over which the phones that join before the track do so), `--late-share 0.1` (the share of phones that join during the first half of the track), `--settle 60` (seconds the phones measure their clocks before the track starts), `--server-commit` (the commit the server under test runs, when it cannot be found; see below), `--note` (a few words kept with the run, such as what else ran on the box) and `--ramp` with `--ramp-start 25` and `--ramp-step 25` (see "Ramp" below; not together with `--phones`). A value that is not a number is refused, and so is `--phones` below 2, or a late share that leaves fewer than 2 phones joining before the track, since the offset from the median needs at least two phones (`MIN_PHONES` in [`src/stats.ts`](src/stats.ts)).
 
 A choir run with phrases:
 
@@ -74,6 +74,26 @@ npm run loadtest -- --phones 20 --voices 4 --langs en-US,de-DE --phrase-every 3 
 ```
 
 Each run uploads its own track into a new performance, named `loadtest` with the time of the run.
+
+## Ramp
+
+`--ramp` finds how many phones the server carries. It runs one room after another in the same performance: `--ramp-start` phones, then `--ramp-step` more each time, with no upper limit. Each room is a whole run: its phones join, settle, hear the track and leave, and it is judged by the thresholds above, so every step is measured with settled clocks. With the defaults a step lasts about 100 s. What builds up over a long performance is for a soak run, not for the ramp.
+
+After each step it prints one line: its outcome, arrival p1, offset p99, the clock round trip's median and p99, missing chunks, drops, the server's peak CPU and memory, and the generator's event loop. The round trip's p99 shows whether slow round trips grow with the number of phones: the app's clock uses the faster half of its last 20 round trips, so once more than half are slow, the clock degrades.
+
+The ramp ends at the first step that:
+
+- misses a threshold: it broke there, and it prints the checks it missed,
+- cannot be run to its end, such as when the server stops answering, or
+- is INVALID because the generator fell behind: from there on it says nothing about the server.
+
+It then prints the last step that passed and keeps one results file for the whole ramp, `<date>T<time>Z-<target>-ramp.json`, with every step's figures, verdict and server samples and how it ended. The first Ctrl-C ends the ramp after the step it is running, with its results file; a second one quits at once, without one. It exits 4 when it ended INVALID and 0 otherwise.
+
+```sh
+npm run loadtest -- --api https://sadiss.net/capacity/server --ws wss://sadiss.net/capacity/ws/ --ramp
+```
+
+What a ramp against the capacity instance found is in [`docs/load-test-results.md`](../docs/load-test-results.md).
 
 ## Server samples
 

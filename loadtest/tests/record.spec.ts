@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { readRecord, recordFileName, writeRecord } from '../src/record'
+import { RampRecord, rampFileName, readRecord, recordFileName, writeRampRecord, writeRecord } from '../src/record'
 import { RunResult } from '../src/results'
 import { summarize } from '../src/stats'
 import { judge } from '../src/verdict'
@@ -64,5 +64,23 @@ describe('the results file of a run', () => {
     const path = join(folder, 'not-a-run.json')
     writeFileSync(path, JSON.stringify({ phones: 3 }))
     expect(() => readRecord(path)).toThrow('not-a-run.json')
+  })
+})
+
+describe('the results file of a ramp', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'loadtest-ramp-'))
+  afterAll(() => rmSync(folder, { recursive: true, force: true }))
+  const { result, verdict, serverSamples, notSampledBecause, ...meta } = record
+  const ramp: RampRecord = {
+    ...meta,
+    ramp: { start: 25, step: 25 },
+    steps: [{ result, verdict, serverSamples, notSampledBecause }],
+    end: { kind: 'stoppedByHand', phones: 100 }
+  }
+
+  it('is named by when the ramp started and the target, and keeps every step and how it ended', () => {
+    expect(rampFileName(ramp)).toBe('2026-11-08T1930Z-sadiss.net-capacity-server-ramp.json')
+    const path = writeRampRecord(folder, ramp)
+    expect(JSON.parse(readFileSync(path, 'utf-8'))).toEqual(ramp)
   })
 })

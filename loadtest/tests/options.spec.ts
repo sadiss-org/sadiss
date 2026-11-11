@@ -13,8 +13,23 @@ describe('the command line', () => {
       lateShare: 0.1,
       settleMs: 60000,
       serverCommit: undefined,
-      note: null
+      note: null,
+      ramp: null
     })
+  })
+
+  it('ramps from 25 phones in steps of 25 by default, or as given', () => {
+    expect(parseOptions(['--ramp']).ramp).toEqual({ start: 25, step: 25 })
+    expect(parseOptions(['--ramp', '--ramp-start', '10', '--ramp-step', '5']).ramp).toEqual({ start: 10, step: 5 })
+  })
+
+  it('refuses a number of phones for a ramp, which sets its own, and ramp steps without a ramp', () => {
+    expect(() => parseOptions(['--ramp', '--phones', '100'])).toThrow('--phones')
+    expect(() => parseOptions(['--ramp-step', '10'])).toThrow('--ramp')
+  })
+
+  it('refuses a ramp whose first step leaves too few phones before the track', () => {
+    expect(() => parseOptions(['--ramp', '--ramp-start', '2', '--late-share', '0.5'])).toThrow('--late-share')
   })
 
   it('keeps a note and a server commit given on the command line', () => {
@@ -73,7 +88,9 @@ describe('the command line', () => {
     ['--voices', '0'],
     ['--phrase-every', '0'],
     ['--late-share', '1'],
-    ['--late-share', '-0.1']
+    ['--late-share', '-0.1'],
+    ['--ramp-start', '1'],
+    ['--ramp-step', '0']
   ])('refuses %s %s instead of running a test that cannot fail', (option, value) => {
     expect(() => parseOptions([option, value])).toThrow(option)
   })

@@ -1,11 +1,12 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
+import { RampEnd } from './ramp'
 import { RunResult } from './results'
 import { ServerSample } from './serverSampler'
 import { Verdict } from './verdict'
 
-/** Everything a results file keeps about one run, so it can be read and compared later. */
-export interface RunRecord {
+/** What a results file keeps about how and where a run, or a ramp, was made. */
+export interface RunMeta {
   /** The commit the server under test was built from, with `-dirty` when it ran from a checkout with uncommitted changes; null when unknown. */
   serverCommit: string | null
   /** The commit of the load test that ran, with `-dirty` likewise; null when unknown. */
@@ -17,6 +18,10 @@ export interface RunRecord {
   generator: { cpu: string; threads: number; node: string; platform: string }
   /** What the numbers do not say, such as what else ran on the box, given with --note; null when none was given. */
   note: string | null
+}
+
+/** Everything a results file keeps about one run, so it can be read and compared later. */
+export interface RunRecord extends RunMeta {
   result: RunResult
   verdict: Verdict
   /** The server under test and its box, sampled every few seconds through the run. */
@@ -32,20 +37,37 @@ const slug = (url: string) =>
     .replace(/[^A-Za-z0-9.]+/g, '-')
     .replace(/^-|-$/g, '')
 
-/** `<date>T<hours><minutes>Z-<target>-<phones>p.json`, so a folder of results lists in the order the runs were made. */
-export const recordFileName = (record: RunRecord) => {
-  const [date = '', time = ''] = record.runAt.split('T')
+/** Everything a ramp's results file keeps: each step as one run's results file does, and how the ramp ended. */
+export interface RampRecord extends RunMeta {
+  ramp: { start: number; step: number }
+  steps: Omit<RunRecord, keyof RunMeta>[]
+  end: RampEnd
+}
+
+const fileName = (meta: RunMeta, what: string) => {
+  const [date = '', time = ''] = meta.runAt.split('T')
   const when = time ? `${date}T${time.slice(0, 2)}${time.slice(3, 5)}Z` : date
-  return `${when}-${slug(record.target.apiUrl)}-${record.result.phones}p.json`
+  return `${when}-${slug(meta.target.apiUrl)}-${what}.json`
+}
+
+/** `<date>T<hours><minutes>Z-<target>-<phones>p.json`, so a folder of results lists in the order the runs were made. */
+export const recordFileName = (record: RunRecord) => fileName(record, `${record.result.phones}p`)
+
+/** `<date>T<hours><minutes>Z-<target>-ramp.json`. */
+export const rampFileName = (record: RampRecord) => fileName(record, 'ramp')
+
+const write = (folder: string, name: string, content: object) => {
+  mkdirSync(folder, { recursive: true })
+  const path = join(folder, name)
+  writeFileSync(path, `${JSON.stringify(content, null, 2)}\n`)
+  return path
 }
 
 /** Writes a run's results file into `folder` and returns its path. */
-export const writeRecord = (folder: string, record: RunRecord) => {
-  mkdirSync(folder, { recursive: true })
-  const path = join(folder, recordFileName(record))
-  writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`)
-  return path
-}
+export const writeRecord = (folder: string, record: RunRecord) => write(folder, recordFileName(record), record)
+
+/** Writes a ramp's results file into `folder` and returns its path. */
+export const writeRampRecord = (folder: string, record: RampRecord) => write(folder, rampFileName(record), record)
 
 const isRecord = (value: unknown): value is RunRecord => {
   if (typeof value !== 'object' || value === null) return false

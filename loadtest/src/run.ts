@@ -29,21 +29,25 @@ export const stopTrack = async (performance: Pick<PreparedPerformance, 'stop'>, 
   }
 }
 
+/** Uploads the run's generated track into a new performance on the server under test. */
+export const prepare = async (options: Options, admin: { email: string; password: string }) => {
+  const target = await createTarget(options.apiUrl, admin.email, admin.password)
+  return target.prepare(options.track, `loadtest ${new Date().toISOString()}`)
+}
+
 /**
- * One run with a fixed number of phones: most phones join and measure their
- * clocks before the track, the rest join during its first half, and all of
- * them hear the track to its end and leave. The server is sampled from the
- * first phone joining until the track is stopped, where it can be.
+ * One room of `phones` phones in a prepared performance: most phones join and
+ * measure their clocks before the track, the rest join during its first half,
+ * and all of them hear the track to its end and leave. The server is sampled
+ * from the first phone joining until the track is stopped, where it can be.
  */
-export const runFixed = async (
+export const runRoom = async (
+  performance: PreparedPerformance,
+  phones: number,
   options: Options,
-  admin: { email: string; password: string },
   warn: (message: string) => void,
   sampling: SamplingTarget
 ): Promise<{ result: RunResult; server: Sampled }> => {
-  const target = await createTarget(options.apiUrl, admin.email, admin.password)
-  const performance = await target.prepare(options.track, `loadtest ${new Date().toISOString()}`)
-
   const expectedS = (options.joinOverMs + options.settleMs + performance.chunkCount * CHUNK_SECONDS * 1000 + TAIL_MS) / 1000
   const sampler =
     'notSampledBecause' in sampling ? null : startSampler(sampling, { everyS: SAMPLE_EVERY_S, forAtMostS: Math.ceil(expectedS) + SAMPLER_SPARE_S })
@@ -53,7 +57,7 @@ export const runFixed = async (
   const audience = createAudience()
   let watching: ReturnType<typeof watch> | undefined
   try {
-    const seats = planRoom({ phones: options.phones, track: options.track, lateShare: options.lateShare }).map((seat) => ({
+    const seats = planRoom({ phones, track: options.track, lateShare: options.lateShare }).map((seat) => ({
       wsUrl: options.wsUrl,
       performanceId: performance.id,
       seat

@@ -5,6 +5,7 @@ import { TrackShape } from './track'
 export interface Options {
   apiUrl: string
   wsUrl: string
+  /** How many phones a run has; for a ramp, its first step. */
   phones: number
   track: TrackShape
   /** Over how long the phones that join before the track do so, in ms. */
@@ -17,6 +18,8 @@ export interface Options {
   serverCommit: string | undefined
   /** Kept in the results file with the run. */
   note: string | null
+  /** A ramp of rooms with `start`, `start + step`, ... phones instead of one run; null for one run. */
+  ramp: { start: number; step: number } | null
 }
 
 const number = (option: string, value: string, { atLeast, whole }: { atLeast: number; whole: boolean }) => {
@@ -47,7 +50,7 @@ export const parseOptions = (args: string[]): Options => {
     options: {
       api: { type: 'string', default: 'http://127.0.0.1:3000' },
       ws: { type: 'string', default: 'ws://127.0.0.1:8080' },
-      phones: { type: 'string', default: '10' },
+      phones: { type: 'string' },
       seconds: { type: 'string', default: '30' },
       partials: { type: 'string' },
       voices: { type: 'string' },
@@ -59,7 +62,10 @@ export const parseOptions = (args: string[]): Options => {
       // estimate is settled about a minute after a phone joins.
       settle: { type: 'string', default: '60' },
       'server-commit': { type: 'string' },
-      note: { type: 'string' }
+      note: { type: 'string' },
+      ramp: { type: 'boolean', default: false },
+      'ramp-start': { type: 'string' },
+      'ramp-step': { type: 'string' }
     }
   })
 
@@ -73,7 +79,19 @@ export const parseOptions = (args: string[]): Options => {
   const partials = number('partials', values.partials ?? '16', { atLeast: 1, whole: true })
   const everySeconds = number('phrase-every', values['phrase-every'] ?? '4', { atLeast: 1, whole: false })
 
-  const phones = number('phones', values.phones, { atLeast: MIN_PHONES, whole: true })
+  if (!values.ramp && (values['ramp-start'] !== undefined || values['ramp-step'] !== undefined)) {
+    throw new Error('--ramp-start and --ramp-step need --ramp.')
+  }
+  if (values.ramp && values.phones !== undefined) {
+    throw new Error('--phones cannot be given with --ramp, which sets the phones of each step from --ramp-start and --ramp-step.')
+  }
+  const ramp = values.ramp
+    ? {
+        start: number('ramp-start', values['ramp-start'] ?? '25', { atLeast: MIN_PHONES, whole: true }),
+        step: number('ramp-step', values['ramp-step'] ?? '25', { atLeast: 1, whole: true })
+      }
+    : null
+  const phones = ramp?.start ?? number('phones', values.phones ?? '10', { atLeast: MIN_PHONES, whole: true })
   const lateShare = number('late-share', values['late-share'], { atLeast: 0, whole: false })
   if (phones - Math.round(phones * lateShare) < MIN_PHONES) {
     throw new Error(`--late-share ${lateShare} leaves fewer than ${MIN_PHONES} of ${phones} phones joining before the track, too few to measure their clocks against.`)
@@ -93,6 +111,7 @@ export const parseOptions = (args: string[]): Options => {
     lateShare,
     settleMs: number('settle', values.settle, { atLeast: 0, whole: false }) * 1000,
     serverCommit: values['server-commit'],
-    note: values.note ?? null
+    note: values.note ?? null,
+    ramp
   }
 }
