@@ -108,8 +108,7 @@ number change — each level brings behaviour changes that need testing on a dev
 While a phone is joined to a performance, the app runs a foreground service of type
 `mediaPlayback` with a silent notification, "SADISS is playing". Without it Android
 treats a locked phone's app as cached and reclaims it a few minutes after the screen
-locks, and the phone drops out of the piece. The service and its permissions
-(`FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `POST_NOTIFICATIONS`) are
+locks, and the phone drops out of the piece. The service and its permissions are
 declared by the local plugin in `app/plugins/playback-service/`.
 
 Play asks every app that targets Android 14 or later to declare its foreground

@@ -13,7 +13,7 @@ vi.mock('@capacitor-community/keep-awake', () => ({
 }))
 
 vi.mock('@sadiss/playback-service', () => ({
-  PlaybackService: { start: vi.fn(), stop: vi.fn() }
+  PlaybackService: { start: vi.fn() }
 }))
 
 const getPlatform = Capacitor.getPlatform as Mock

@@ -12,7 +12,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
-/** Starts and stops {@link PlaybackService}; it never outlives the app's activity. */
+/** Starts {@link PlaybackService}, which runs until the app's activity is destroyed. */
 @CapacitorPlugin(
     name = "PlaybackService",
     permissions = { @Permission(alias = PlaybackServicePlugin.NOTIFICATIONS, strings = { Manifest.permission.POST_NOTIFICATIONS }) }
@@ -23,32 +23,24 @@ public class PlaybackServicePlugin extends Plugin {
 
     @PluginMethod
     public void start(PluginCall call) {
+        try {
+            ContextCompat.startForegroundService(getContext(), serviceIntent());
+        } catch (RuntimeException refused) {
+            call.reject(refused.getMessage(), refused);
+            return;
+        }
         // From Android 13 a notification needs the user's permission. The service
-        // runs without it; only its notification stays hidden.
+        // already runs without it, so a phone locked before the user answers is
+        // kept running too; only the notification stays hidden until it is granted.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && getPermissionState(NOTIFICATIONS) != PermissionState.GRANTED) {
             requestPermissionForAlias(NOTIFICATIONS, call, "notificationsAnswered");
             return;
         }
-        startService(call);
+        call.resolve();
     }
 
     @PermissionCallback
     private void notificationsAnswered(PluginCall call) {
-        startService(call);
-    }
-
-    private void startService(PluginCall call) {
-        try {
-            ContextCompat.startForegroundService(getContext(), serviceIntent());
-            call.resolve();
-        } catch (RuntimeException refused) {
-            call.reject(refused.getMessage(), refused);
-        }
-    }
-
-    @PluginMethod
-    public void stop(PluginCall call) {
-        getContext().stopService(serviceIntent());
         call.resolve();
     }
 

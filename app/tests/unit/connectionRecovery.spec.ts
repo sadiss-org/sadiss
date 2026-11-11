@@ -23,6 +23,11 @@ vi.mock('@/composables/useClockMeasurement', () => ({
   })
 }))
 
+// Each fresh copy would register the native plugin again, which Capacitor refuses.
+vi.mock('@sadiss/playback-service', () => ({
+  PlaybackService: { start: vi.fn() }
+}))
+
 /** A fresh copy of the connection module, so no test inherits another's state. */
 const connection = async () => {
   createTestingPinia({ stubActions: false })
