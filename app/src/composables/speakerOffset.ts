@@ -1,3 +1,11 @@
+/**
+ * How far an output timestamp may sit from the render position, in seconds, and
+ * still be believed: past the output latency of any phone, Bluetooth included,
+ * and the steps `currentTime` moves in. iOS 16 gives stamps minutes off.
+ */
+const MAX_STAMP_TRAIL_S = 1
+const MAX_STAMP_LEAD_S = 0.1
+
 /** One reading of the clocks a phone schedules its sound with, all taken at the same moment. */
 export interface ClockReading {
   /** The shared server clock, in seconds. */
@@ -31,6 +39,7 @@ export const speakerOffset = ({ serverNowS, pageNowMs, renderTimeS, outputLatenc
   const serverAtStamp = serverNowS + (stamp.performanceTime - pageNowMs) / 1000
   const outputOffset = serverAtStamp - stamp.contextTime
   const stampTrailsRender = outputOffset - renderOffset
+  if (stampTrailsRender > MAX_STAMP_TRAIL_S || stampTrailsRender < -MAX_STAMP_LEAD_S) return renderOffset + latency
   // The stamp either covers the latency or leaves it out; half of it decides
   // which, so that the steps of `currentTime` do not.
   return stampTrailsRender >= latency / 2 ? outputOffset : outputOffset + latency
