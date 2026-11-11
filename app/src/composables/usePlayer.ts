@@ -3,6 +3,7 @@ import { TextToSpeech } from '@capacitor-community/text-to-speech'
 import { PartialChunk, OscillatorObject, Breakpoint } from '../types/types'
 import { useMainStore } from '@/stores/MainStore'
 import type { DeviceState } from './deviceConnection'
+import { speakerOffset } from './speakerOffset'
 
 const BREAKPOINT_LENGTH = 0.01 // in seconds
 const AMP_MIN_VALUE = 0.000001
@@ -278,7 +279,14 @@ export function usePlayer() {
 
   const setMotionRef = (motionRef: { pos: number }) => (motion = motionRef)
 
-  const setOffset = () => (offset = motion.pos - ctx.currentTime)
+  const setOffset = () =>
+    (offset = speakerOffset({
+      serverNowS: motion.pos,
+      pageNowMs: performance.now(),
+      renderTimeS: ctx.currentTime,
+      outputLatencyS: finiteOrNull(ctx.outputLatency),
+      stamp: outputTimestamp(ctx)
+    }))
 
   const setTrackSettings = (wf: OscillatorType, rate: string) => {
     waveform = wf
