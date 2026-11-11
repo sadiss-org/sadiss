@@ -13,10 +13,12 @@ vi.mock('@/composables/deviceConnection', () => ({ connectDevice: vi.fn() }))
 createTestingPinia({ stubActions: false })
 
 describe('joining a performance', () => {
-  it('keeps the phone running', async () => {
+  it('keeps the phone running, once per app run', async () => {
     useMainStore().wsUrl = 'ws://localhost:8080'
+    const { establishWebsocketConnection } = useWebsocketConnection()
 
-    await useWebsocketConnection().establishWebsocketConnection()
+    await establishWebsocketConnection()
+    await establishWebsocketConnection()
 
     expect(stayAlive).toHaveBeenCalledTimes(1)
   })

@@ -2,11 +2,9 @@ import { Capacitor } from '@capacitor/core'
 import { KeepAwake } from '@capacitor-community/keep-awake'
 import { PlaybackService } from '@sadiss/playback-service'
 
-let holding = false
-
 /**
  * Keeps the phone running the app for as long as it is joined to a performance,
- * which is until the app closes. Later calls do nothing.
+ * which is until the app closes. Called once, when the phone joins.
  *
  * The screen is held awake, not only while connected: a phone that locks while it
  * reconnects stops running the app, and with it the reconnect. On Android a
@@ -16,9 +14,6 @@ let holding = false
  * A failure is logged and never stops the join.
  */
 export async function stayAlive(): Promise<void> {
-  if (holding) return
-  holding = true
-
   const platform = Capacitor.getPlatform()
   if (platform === 'web') return
 

@@ -2,6 +2,7 @@ import type { Mock } from 'vitest'
 import { Capacitor } from '@capacitor/core'
 import { KeepAwake } from '@capacitor-community/keep-awake'
 import { PlaybackService } from '@sadiss/playback-service'
+import { stayAlive } from '@/composables/stayAlive'
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: { getPlatform: vi.fn() }
@@ -19,13 +20,6 @@ const getPlatform = Capacitor.getPlatform as Mock
 const keepAwake = KeepAwake.keepAwake as Mock
 const startService = PlaybackService.start as Mock
 
-/** A fresh copy of the module, as on a new app run. */
-const freshStayAlive = async () => {
-  vi.resetModules()
-  const { stayAlive } = await import('@/composables/stayAlive')
-  return stayAlive
-}
-
 describe('stayAlive', () => {
   beforeEach(() => {
     getPlatform.mockReset()
@@ -35,19 +29,7 @@ describe('stayAlive', () => {
 
   it('keeps an Android screen awake and starts the playback service', async () => {
     getPlatform.mockReturnValue('android')
-    const stayAlive = await freshStayAlive()
 
-    await stayAlive()
-
-    expect(keepAwake).toHaveBeenCalledTimes(1)
-    expect(startService).toHaveBeenCalledTimes(1)
-  })
-
-  it('does nothing more when called a second time', async () => {
-    getPlatform.mockReturnValue('android')
-    const stayAlive = await freshStayAlive()
-
-    await stayAlive()
     await stayAlive()
 
     expect(keepAwake).toHaveBeenCalledTimes(1)
@@ -56,7 +38,6 @@ describe('stayAlive', () => {
 
   it('only keeps the screen awake on iOS', async () => {
     getPlatform.mockReturnValue('ios')
-    const stayAlive = await freshStayAlive()
 
     await stayAlive()
 
@@ -66,7 +47,6 @@ describe('stayAlive', () => {
 
   it('does nothing in a browser', async () => {
     getPlatform.mockReturnValue('web')
-    const stayAlive = await freshStayAlive()
 
     await stayAlive()
 
@@ -78,7 +58,6 @@ describe('stayAlive', () => {
   it('resolves and still keeps the screen awake when the service cannot start', async () => {
     getPlatform.mockReturnValue('android')
     startService.mockRejectedValue(new Error('startForegroundService() not allowed'))
-    const stayAlive = await freshStayAlive()
 
     await expect(stayAlive()).resolves.toBeUndefined()
 
@@ -88,7 +67,6 @@ describe('stayAlive', () => {
   it('still starts the service when the screen cannot be kept awake', async () => {
     getPlatform.mockReturnValue('android')
     keepAwake.mockRejectedValue(new Error('no window'))
-    const stayAlive = await freshStayAlive()
 
     await expect(stayAlive()).resolves.toBeUndefined()
 
