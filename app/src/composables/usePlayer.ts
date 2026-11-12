@@ -9,7 +9,20 @@ const BREAKPOINT_LENGTH = 0.01 // in seconds
 const AMP_MIN_VALUE = 0.000001
 const FREQ_MIN_VALUE = 0.000001
 
+/** How often the audio clock is checked for having stopped, in ms. */
+const CLOCK_CHECK_MS = 1000
+/**
+ * Checks in a row the audio clock may stand still while its context says it is
+ * running before the audio is built again. A running clock moves between any two.
+ */
+const CHECKS_STANDING_STILL_BEFORE_RESTART = 3
+
 let ctx: AudioContext
+/** The sounding oscillators, all on the current audio context. */
+const oscillators: OscillatorObject[] = []
+/** How often the audio was built again because its clock had stopped. */
+let restarts = 0
+let clockWatch: ReturnType<typeof setInterval> | undefined
 let offset: number
 let motion: { pos: number } = reactive({ pos: -1 })
 let outputLatencyOffset = 0
@@ -98,7 +111,6 @@ const outputTimestamp = (context: AudioContext) => {
 }
 
 export function usePlayer() {
-  const oscillators: OscillatorObject[] = []
   const currentChunkStartTimeInCtxTime = ref()
 
   /**
@@ -115,7 +127,11 @@ export function usePlayer() {
     const { audioSession } = navigator as Navigator & { audioSession?: { type: string } }
     if (audioSession) audioSession.type = 'playback'
     startKeepAlive()
+    createAudioCtx()
+    watchAudioClock()
+  }
 
+  const createAudioCtx = () => {
     ctx = new AudioContext()
 
     ctx.onstatechange = () => {
@@ -132,6 +148,41 @@ export function usePlayer() {
     }
 
     setOffset()
+  }
+
+  /**
+   * Builds the audio again whenever its clock stands still while the context
+   * says it is running. Some iPhones stop rendering that way and never report
+   * it, so nothing is heard and the state change handler above never fires. A
+   * suspended or interrupted context is left to that handler.
+   */
+  const watchAudioClock = () => {
+    if (clockWatch) return
+    let lastTime = ctx.currentTime
+    let checksStandingStill = 0
+    clockWatch = setInterval(() => {
+      if (ctx.state !== 'running' || ctx.currentTime !== lastTime) {
+        lastTime = ctx.currentTime
+        checksStandingStill = 0
+        return
+      }
+      checksStandingStill++
+      if (checksStandingStill < CHECKS_STANDING_STILL_BEFORE_RESTART) return
+      restartAudioCtx()
+      lastTime = ctx.currentTime
+      checksStandingStill = 0
+    }, CLOCK_CHECK_MS)
+  }
+
+  /** Replaces the audio context with a new one. The oscillators of the old one go with it. */
+  const restartAudioCtx = () => {
+    const stopped = ctx
+    stopped.onstatechange = null
+    stopped.close().catch((error) => console.warn('The stopped audio context did not close:', error))
+    oscillators.length = 0
+    restarts++
+    console.warn('The audio clock stood still while running; the audio was built again.')
+    createAudioCtx()
   }
 
   /**
@@ -152,7 +203,7 @@ export function usePlayer() {
 
   let startTimeInCtxTime: number
 
-  const handleChunkData = async (trackData: { partials: PartialChunk[]; ttsInstructions: { time: number; phrase: string } }) => {
+  const handleChunkData = async (trackData: { partials: PartialChunk[]; ttsInstructions?: { time: number; phrase: string } }) => {
     if (!fadeOutAndStopOscillatorsInterval) {
       startFadeOutAndStopOscillatorsInterval() // Currently we leave this running until app is closed
     }
@@ -305,7 +356,8 @@ export function usePlayer() {
           outputLatency: finiteOrNull(ctx.outputLatency),
           baseLatency: finiteOrNull(ctx.baseLatency),
           sampleRate: finiteOrNull(ctx.sampleRate),
-          outputTimestamp: outputTimestamp(ctx)
+          outputTimestamp: outputTimestamp(ctx),
+          restarts
         }
       : null,
     keepAlivePlaying: keepAlive ? !keepAlive.paused : null,
