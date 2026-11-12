@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Typechecks and tests the packages a push touches.
+# Typechecks, format-checks and tests the packages a push touches.
 #
 # Enable it in a clone with:
 #   git config core.hooksPath .githooks
@@ -44,9 +44,9 @@ check() {
   done
 }
 
-check server 'npx tsc --noEmit' 'npx vitest run'
+check server 'npx tsc --noEmit' 'npx prettier --check "**/*.ts"' 'npx vitest run'
 check admin_client 'npx vue-tsc -b' 'npx vitest run'
-check app 'npx vitest run'
+check app 'npx prettier --check "src/**/*.{ts,vue}" "tests/**/*.ts"' 'npx vitest run'
 
 if [ "$failed" -ne 0 ]; then
   echo "pre-push: refusing to push. Fix the above, or push with --no-verify."

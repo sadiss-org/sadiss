@@ -29,9 +29,7 @@ export interface DeviceIdentity {
 }
 
 /** Builds the handshake this build sends when the socket opens. */
-export const buildClientInfoMessage = (
-  client: Omit<ClientInfoMessage, 'message' | 'protocolVersion'>
-): ClientInfoMessage => ({
+export const buildClientInfoMessage = (client: Omit<ClientInfoMessage, 'message' | 'protocolVersion'>): ClientInfoMessage => ({
   message: 'clientInfo',
   ...client,
   protocolVersion: PROTOCOL_VERSION
