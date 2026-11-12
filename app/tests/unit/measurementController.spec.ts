@@ -7,7 +7,8 @@ const report: PhoneReport = {
   audio: null,
   visible: true,
   keepAlivePlaying: false,
-  lastChunk: { index: 3, leadMs: 900 }
+  lastChunk: { index: 3, leadMs: 900 },
+  tts: null
 }
 
 const setup = (opts: { nowSeq?: number[]; report?: () => PhoneReport } = {}) => {

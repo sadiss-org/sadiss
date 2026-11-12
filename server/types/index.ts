@@ -14,7 +14,8 @@ import {
   MeasureMessage,
   MeasureResponseMessage,
   MeasureConfigMessage,
-  PhoneReport
+  PhoneReport,
+  PhraseReport
 } from './Measurement'
 import {
   ClientInfoMessage,
@@ -42,6 +43,7 @@ export {
   MeasureResponseMessage,
   MeasureConfigMessage,
   PhoneReport,
+  PhraseReport,
   ClientInfoMessage,
   DeviceIdentity,
   CURRENT_PROTOCOL_VERSION,

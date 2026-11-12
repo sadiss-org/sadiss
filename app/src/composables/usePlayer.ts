@@ -3,6 +3,7 @@ import { TextToSpeech } from '@capacitor-community/text-to-speech'
 import { PartialChunk, OscillatorObject, Breakpoint } from '../types/types'
 import { useMainStore } from '@/stores/MainStore'
 import type { DeviceState } from './deviceConnection'
+import type { PhraseReport } from '@/types/measurement'
 import { createStampReader, speakerOffset } from './speakerOffset'
 
 const BREAKPOINT_LENGTH = 0.01 // in seconds
@@ -31,6 +32,17 @@ let outputLatencyOffset = 0
 let waveform: OscillatorType
 let ttsRate = 1
 let keepAlive: HTMLAudioElement | undefined
+
+/**
+ * Phrases kept for the next report. While the server asks for no reports none
+ * go out, so only the newest are kept.
+ */
+const MAX_PHRASE_REPORTS = 20
+const phraseReports: PhraseReport[] = []
+const keepPhraseReport = (report: PhraseReport) => {
+  phraseReports.push(report)
+  if (phraseReports.length > MAX_PHRASE_REPORTS) phraseReports.splice(0, phraseReports.length - MAX_PHRASE_REPORTS)
+}
 
 /**
  * Languages the phone was found to have a voice for. Only a yes is kept: on
@@ -281,7 +293,7 @@ export function usePlayer() {
         const timeToSpeakAt = startTimeInCtxTime + tts.time + outputLatencyOffset
         if (ctx.currentTime >= timeToSpeakAt) {
           clearInterval(speakingInterval)
-          speak(tts.phrase)
+          void speak(tts.phrase, tts.time, timeToSpeakAt)
         }
       }, 100)
     }
@@ -337,16 +349,27 @@ export function usePlayer() {
     }
   }
 
-  const speak = async (text: string) => {
-    await TextToSpeech.speak({
-      text: text,
-      lang: await voiceLanguage(),
-      rate: ttsRate,
-      pitch: 1.0,
-      volume: 1.0,
-      category: 'playback'
-    })
+  /**
+   * Speaks a phrase and keeps how it went for the next report. A failure is
+   * kept, not thrown: one phrase the engine cannot speak must not stop the rest.
+   */
+  const speak = async (text: string, trackTimeS: number, dueAtCtxS: number) => {
+    const lang = await voiceLanguage()
+    const rate = ttsRate
+    const askedLateMs = (ctx.currentTime - dueAtCtxS) * 1000
+    const askedAt = performance.now()
+    let error: string | null = null
+    try {
+      await TextToSpeech.speak({ text, lang, rate, pitch: 1.0, volume: 1.0, category: 'playback' })
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err)
+      console.warn('A TTS phrase was not spoken:', err)
+    }
+    keepPhraseReport({ trackTimeS, lang: lang ?? null, rate, askedLateMs, tookMs: performance.now() - askedAt, error })
   }
+
+  /** The phrases finished since this was last called, oldest first, for the phone report. */
+  const takePhraseReports = (): PhraseReport[] => phraseReports.splice(0)
 
   const setMotionRef = (motionRef: { pos: number }) => (motion = motionRef)
 
@@ -388,6 +411,7 @@ export function usePlayer() {
 
   return {
     deviceState,
+    takePhraseReports,
     handleChunkData,
     preparePlaybackAndTts,
     setStartTime,
