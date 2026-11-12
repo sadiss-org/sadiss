@@ -53,9 +53,14 @@ export const createClockSync = ({
     }
   }
 
-  const syncPingSchedule = () => {
+  /**
+   * Pings at once and then once per interval. The first ping goes out without
+   * waiting, because the phone cannot place any sound until a reply comes back.
+   */
+  const restartPinging = () => {
     stopPinging()
     if (controller && controller.getIntervalMs() > 0) {
+      controller.ping()
       pingInterval = setInterval(() => controller?.ping(), controller.getIntervalMs())
     }
   }
@@ -77,7 +82,7 @@ export const createClockSync = ({
     handleMessage: (payload) => {
       if (!controller || !isInboundMeasurementMessage(payload)) return false
       controller.handleMessage(payload)
-      syncPingSchedule()
+      if (payload.message === 'measureConfig') restartPinging()
       return true
     },
     intervalMs: () => controller?.getIntervalMs() ?? 0,
