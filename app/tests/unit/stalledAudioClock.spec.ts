@@ -155,6 +155,48 @@ describe('an audio clock that stopped', () => {
   })
 })
 
+/** iOS limits how many audio contexts a page holds, so a phone that joins again must not keep the old one. */
+describe('joining again', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    FakeAudioContext.made = []
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('closes the audio context of the earlier join', async () => {
+    const player = await preparedPlayer()
+    const earlier = latestContext()
+
+    void player.preparePlaybackAndTts()
+
+    expect(earlier.closed).toBe(true)
+    expect(FakeAudioContext.made.filter((context) => !context.closed)).toHaveLength(1)
+  })
+
+  it('plays the next chunk on the new context', async () => {
+    const player = await preparedPlayer()
+    const earlier = latestContext()
+
+    void player.preparePlaybackAndTts()
+    player.handleChunkData(chunk)
+
+    expect(earlier.oscillatorsMade).toBe(0)
+    expect(latestContext().oscillatorsMade).toBe(1)
+  })
+
+  it('is not counted as a restart of a stopped audio clock', async () => {
+    const player = await preparedPlayer()
+
+    void player.preparePlaybackAndTts()
+
+    expect(player.deviceState().audio?.restarts).toBe(0)
+  })
+})
+
 describe('stopping playback', () => {
   beforeEach(() => {
     vi.useFakeTimers()
