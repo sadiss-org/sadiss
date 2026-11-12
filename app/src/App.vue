@@ -26,5 +26,4 @@ ion-button {
 ion-back-button {
   --color: white !important;
 }
-
 </style>

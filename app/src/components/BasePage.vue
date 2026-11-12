@@ -4,7 +4,7 @@
     <div class="flex flex-col items-center">
       <img
         src="/assets/sadiss-logo.png"
-        class="mt-6 mb-2 w-[40%]" />
+        class="mb-2 mt-6 w-[40%]" />
     </div>
     <main class="flex flex-grow flex-col items-center justify-between px-8">
       <slot />

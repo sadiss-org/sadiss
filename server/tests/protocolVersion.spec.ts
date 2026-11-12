@@ -75,7 +75,10 @@ describe('protocol version in the client handshake', () => {
   it('serves audio to a client that sends no protocol version', { timeout: 20000 }, async () => {
     const track: TrackDocument = await createTestTrack('partials')
     const performanceId = await createTestPerformance()
-    await agent.post('/api/add-tracks-to-performance').send({ trackIds: [track._id], performanceId }).expect(201)
+    await agent
+      .post('/api/add-tracks-to-performance')
+      .send({ trackIds: [track._id], performanceId })
+      .expect(201)
 
     // Exactly the handshake an app built before protocol versioning sends.
     const { ws, messages } = await connectClient({ clientId: 0, ttsLang, performanceId: performanceId.toString() })

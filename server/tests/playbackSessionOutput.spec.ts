@@ -92,14 +92,7 @@ describe('what a playback session sends', () => {
       const soprano = listener('soprano', { choirId: 0 })
       const alto = listener('alto', { choirId: 1 })
       const audience = audienceOf([soprano, alto])
-      const session = new PlaybackSession(
-        PERFORMANCE_ID,
-        'track',
-        [frame([partial(0), partial(1)])],
-        0,
-        false,
-        settings()
-      )
+      const session = new PlaybackSession(PERFORMANCE_ID, 'track', [frame([partial(0), partial(1)])], 0, false, settings())
 
       session.start(100, audience.read, noLog)
       playChunks(1)

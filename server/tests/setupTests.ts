@@ -75,9 +75,7 @@ beforeAll(async () => {
   // The admin websocket is authenticated by the same cookie, which a browser
   // sends with the upgrade request. `ws` needs it passed as a header, and only
   // the name=value part of each Set-Cookie belongs in one.
-  authCookie = ((login.headers['set-cookie'] ?? []) as string[])
-    .map((setCookie) => setCookie.split(';')[0])
-    .join('; ')
+  authCookie = ((login.headers['set-cookie'] ?? []) as string[]).map((setCookie) => setCookie.split(';')[0]).join('; ')
 })
 
 beforeEach(async () => {

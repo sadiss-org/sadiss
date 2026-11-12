@@ -21,7 +21,9 @@ const main = async () => {
   // The in-memory database lives only as long as this script, so an account
   // made there would be gone before anyone could log in with it.
   if (process.env.NODE_ENV === 'test' || process.env.USE_IN_MEMORY_DB === 'true') {
-    console.error('The server is configured for its in-memory database; point it at a real one (MONGO_URL, USE_IN_MEMORY_DB=false).')
+    console.error(
+      'The server is configured for its in-memory database; point it at a real one (MONGO_URL, USE_IN_MEMORY_DB=false).'
+    )
     process.exit(2)
   }
 

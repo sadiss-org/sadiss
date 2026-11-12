@@ -91,5 +91,4 @@ const navigateToNextPage = () => {
     ionRouter.navigate('/language-selection', 'forward', 'push')
   }
 }
-
 </script>

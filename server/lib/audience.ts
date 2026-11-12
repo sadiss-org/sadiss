@@ -34,13 +34,12 @@ export const performanceOfDevice = (client: { performanceId: unknown; isAdmin: b
  * An admin watching the performance is not among them: it is told where the
  * performance has got to by its own push. See docs/wire-protocol.md.
  */
-export const webSocketAudience =
-  (wss: SadissWebSocketServer, performanceKey: string) => (): Recipient[] =>
-    Array.from(wss.clients)
-      .filter((client) => performanceOfDevice(client) === performanceKey)
-      .map((client) => ({
-        id: client.id,
-        choirId: client.choirId,
-        ttsLang: client.ttsLang,
-        send: (data) => client.safeSend(data)
-      }))
+export const webSocketAudience = (wss: SadissWebSocketServer, performanceKey: string) => (): Recipient[] =>
+  Array.from(wss.clients)
+    .filter((client) => performanceOfDevice(client) === performanceKey)
+    .map((client) => ({
+      id: client.id,
+      choirId: client.choirId,
+      ttsLang: client.ttsLang,
+      send: (data) => client.safeSend(data)
+    }))

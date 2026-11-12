@@ -77,11 +77,7 @@ export const startSession = (session: PlaybackSession, startTime: number, wss: S
   }
 
   sessions.set(session.performanceKey, session)
-  return session.start(
-    startTime,
-    webSocketAudience(wss, session.performanceKey),
-    performanceLogFiles.for(session.performanceKey)
-  )
+  return session.start(startTime, webSocketAudience(wss, session.performanceKey), performanceLogFiles.for(session.performanceKey))
 }
 
 /** Stops and discards the session for a performance. Returns false if none was playing. */

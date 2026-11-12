@@ -196,18 +196,16 @@ const connectionLog = createConnectionLog(performanceLogFiles, performanceExists
  * login is not made an admin, and one that names a performance follows it only
  * if that account may see it in its performance list.
  */
-const registerAdmin = async (
-  wss: SadissWebSocketServer,
-  client: SadissWebSocket,
-  registration: AdminRegistrationMessage
-) => {
+const registerAdmin = async (wss: SadissWebSocketServer, client: SadissWebSocket, registration: AdminRegistrationMessage) => {
   if (!client.userId) {
     logger.warn(`Refused admin registration from client ${client.id}: the connection carried no valid login`)
     return
   }
 
   if (registration.performanceId && !(await mayFollow(client.userId, registration.performanceId))) {
-    logger.warn(`Refused admin registration from client ${client.id}: performance ${registration.performanceId} is not visible to it`)
+    logger.warn(
+      `Refused admin registration from client ${client.id}: performance ${registration.performanceId} is not visible to it`
+    )
     return
   }
 

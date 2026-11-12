@@ -133,7 +133,10 @@ describe('the updates an admin is pushed', () => {
     it('reports the track and the position while one is playing', { timeout: 30000 }, async () => {
       const track: TrackDocument = await createTestTrack('partials')
       const performanceId = await createTestPerformance()
-      await agent.post('/api/add-tracks-to-performance').send({ trackIds: [track._id], performanceId }).expect(201)
+      await agent
+        .post('/api/add-tracks-to-performance')
+        .send({ trackIds: [track._id], performanceId })
+        .expect(201)
 
       const admin = await watchAsAdmin(fastPushingServer(), performanceId.toString())
 
@@ -166,7 +169,10 @@ describe('the updates an admin is pushed', () => {
     it('goes back to saying nothing is playing once the track is stopped', { timeout: 30000 }, async () => {
       const track: TrackDocument = await createTestTrack('partials')
       const performanceId = await createTestPerformance()
-      await agent.post('/api/add-tracks-to-performance').send({ trackIds: [track._id], performanceId }).expect(201)
+      await agent
+        .post('/api/add-tracks-to-performance')
+        .send({ trackIds: [track._id], performanceId })
+        .expect(201)
 
       const admin = await watchAsAdmin(fastPushingServer(), performanceId.toString())
 
@@ -183,7 +189,10 @@ describe('the updates an admin is pushed', () => {
   it('is sent nothing else, even while its performance plays', { timeout: 30000 }, async () => {
     const track: TrackDocument = await createTestTrack('partials')
     const performanceId = await createTestPerformance()
-    await agent.post('/api/add-tracks-to-performance').send({ trackIds: [track._id], performanceId }).expect(201)
+    await agent
+      .post('/api/add-tracks-to-performance')
+      .send({ trackIds: [track._id], performanceId })
+      .expect(201)
 
     // The server the API plays through, so the admin is among the performance's listeners.
     const admin = await watchAsAdmin(global.testWss, performanceId.toString())
@@ -205,9 +214,7 @@ describe('the updates an admin is pushed', () => {
     const device = new WebSocket(`ws://localhost:${port}/`)
     sockets.push(device)
     await new Promise((resolve) => device.on('open', resolve))
-    device.send(
-      JSON.stringify({ message: 'clientInfo', clientId: 3, ttsLang: { iso: 'en-US', lang: 'English' }, performanceId })
-    )
+    device.send(JSON.stringify({ message: 'clientInfo', clientId: 3, ttsLang: { iso: 'en-US', lang: 'English' }, performanceId }))
 
     const admin = await watchAsAdmin(server, performanceId)
     const updates = await admin.repeated()

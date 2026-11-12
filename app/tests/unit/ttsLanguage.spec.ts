@@ -19,7 +19,10 @@ class FakeAudio {
 }
 
 const phraseLanguages = () =>
-  speak.mock.calls.map(([options]) => options).filter((options) => options.text === 'Guten Abend.').map((options) => options.lang)
+  speak.mock.calls
+    .map(([options]) => options)
+    .filter((options) => options.text === 'Guten Abend.')
+    .map((options) => options.lang)
 
 describe('the language a TTS phrase is spoken in', () => {
   beforeEach(() => {

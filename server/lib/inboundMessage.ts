@@ -135,9 +135,7 @@ const readMeasure = (frame: Frame): MeasureMessage | undefined => {
 }
 
 const readAdminRegistration = (frame: Frame): AdminRegistrationMessage | undefined =>
-  isOptional(frame.performanceId, isString)
-    ? { message: 'isAdmin', performanceId: frame.performanceId }
-    : undefined
+  isOptional(frame.performanceId, isString) ? { message: 'isAdmin', performanceId: frame.performanceId } : undefined
 
 // A Map, so a type sent by a client finds only these readers, never a property
 // every object inherits, such as __proto__ or valueOf.

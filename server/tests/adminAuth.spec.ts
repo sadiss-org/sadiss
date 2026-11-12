@@ -92,9 +92,7 @@ describe('registering as an admin', () => {
   }
 
   const someoneElsesPerformance = async (isPublic: boolean) =>
-    String(
-      (await SadissPerformance.create({ name: 'not mine', creator: new Types.ObjectId(), isPublic }))._id
-    )
+    String((await SadissPerformance.create({ name: 'not mine', creator: new Types.ObjectId(), isPublic }))._id)
 
   it('is granted for a performance of its own', { timeout: 20000 }, async () => {
     const messages = await followAsLoggedIn(String(await createTestPerformance(false)))
@@ -135,7 +133,10 @@ describe('registering as an admin', () => {
   it('leaves a refused connection out of the playback report', { timeout: 30000 }, async () => {
     const track: TrackDocument = await createTestTrack('partials')
     const performanceId = await createTestPerformance()
-    await agent.post('/api/add-tracks-to-performance').send({ trackIds: [track._id], performanceId }).expect(201)
+    await agent
+      .post('/api/add-tracks-to-performance')
+      .send({ trackIds: [track._id], performanceId })
+      .expect(201)
 
     const { ws, messages } = await connect()
 
