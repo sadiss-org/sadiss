@@ -118,7 +118,8 @@ const readPhoneReport = (value: unknown): PhoneReport | undefined => {
       outputTimestamp: partOrNull(audio.outputTimestamp, (stamp) => ({
         contextTime: numberOrNull(stamp.contextTime),
         performanceTime: numberOrNull(stamp.performanceTime)
-      }))
+      })),
+      restarts: numberOrNull(audio.restarts)
     })),
     visible: booleanOrNull(value.visible),
     keepAlivePlaying: booleanOrNull(value.keepAlivePlaying),

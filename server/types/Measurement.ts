@@ -50,6 +50,8 @@ export interface PhoneReport {
     baseLatency: number | null
     sampleRate: number | null
     outputTimestamp: { contextTime: number | null; performanceTime: number | null } | null
+    /** How often the phone built its audio again because the audio clock stood still while running. */
+    restarts: number | null
   } | null
   visible: boolean | null
   keepAlivePlaying: boolean | null

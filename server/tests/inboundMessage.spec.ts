@@ -140,7 +140,8 @@ describe('reading a frame as one of our messages', () => {
         outputLatency: 0.04,
         baseLatency: 0.005,
         sampleRate: 48000,
-        outputTimestamp: { contextTime: 12.3, performanceTime: 45678.9 }
+        outputTimestamp: { contextTime: 12.3, performanceTime: 45678.9 },
+        restarts: 1
       },
       visible: false,
       keepAlivePlaying: true,
