@@ -46,6 +46,8 @@ export interface PhoneReport {
     baseLatency: number | null
     sampleRate: number | null
     outputTimestamp: { contextTime: number | null; performanceTime: number | null } | null
+    /** How often the audio was built again because its clock stood still while running. */
+    restarts: number
   } | null
   /** Whether the app is in the foreground. */
   visible: boolean | null

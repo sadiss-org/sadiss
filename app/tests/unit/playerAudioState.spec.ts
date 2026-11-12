@@ -48,7 +48,8 @@ describe("the player's state for the phone report", () => {
         outputLatency: null,
         baseLatency: 0.005,
         sampleRate: 48000,
-        outputTimestamp: null
+        outputTimestamp: null,
+        restarts: 0
       },
       keepAlivePlaying: true,
       visible: true
