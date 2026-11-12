@@ -5,6 +5,12 @@
  */
 const MAX_STAMP_TRAIL_S = 1
 const MAX_STAMP_LEAD_S = 0.1
+/**
+ * How far past the page clock an output timestamp's page time may lie, in ms. A
+ * stamp describes a sample that already left the speaker, so a healthy phone's
+ * is never more than a few ms ahead.
+ */
+const MAX_STAMP_FUTURE_MS = 50
 
 /** One reading of the clocks a phone schedules its sound with, all taken at the same moment. */
 export interface ClockReading {
@@ -43,4 +49,27 @@ export const speakerOffset = ({ serverNowS, pageNowMs, renderTimeS, outputLatenc
   // The stamp either covers the latency or leaves it out; half of it decides
   // which, so that the steps of `currentTime` do not.
   return stampTrailsRender >= latency / 2 ? outputOffset : outputOffset + latency
+}
+
+/** An output timestamp as `speakerOffset` takes it. */
+type OutputStamp = ClockReading['stamp']
+
+/**
+ * The output timestamps of one audio context, each with the page time read
+ * right after it, so that a pause between the two reads makes a stamp look
+ * older, never newer. `read` gives the context's current stamp.
+ *
+ * Once a stamp claims a page time in the future, which a stamp of a sample that
+ * already left the speaker cannot, the context's stamps are not consistent with
+ * each other, and none is given again. Giving only those that look right would
+ * switch the offset between two clocks.
+ */
+export const createStampReader = (read: () => OutputStamp, now: () => number) => {
+  let trusted = true
+  return (): { stamp: OutputStamp; pageNowMs: number } => {
+    const stamp = read()
+    const pageNowMs = now()
+    if (stamp?.performanceTime != null && stamp.performanceTime > pageNowMs + MAX_STAMP_FUTURE_MS) trusted = false
+    return { stamp: trusted ? stamp : null, pageNowMs }
+  }
 }

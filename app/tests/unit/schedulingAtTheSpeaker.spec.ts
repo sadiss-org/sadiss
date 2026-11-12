@@ -132,6 +132,75 @@ describe('a phone schedules its sound for when it leaves the speaker', () => {
     expect(scheduleOffset(player)).toBeCloseTo(renderOffset(50) + 0.02, 6)
   })
 
+  it('does not trust an output timestamp from the future, as on a Galaxy J5 with Android 9', () => {
+    // Measured on a Galaxy J5: its stamps are about 230 ms ahead of the page
+    // clock, and the offsets they give wander by half a second within one run.
+    const player = preparedPlayer({
+      currentTime: 50,
+      outputLatency: 0.088,
+      stamp: { contextTime: 50 - 0.141, performanceTime: PAGE_NOW_MS + 230 }
+    })
+
+    expect(scheduleOffset(player)).toBeCloseTo(renderOffset(50) + 0.088, 6)
+  })
+
+  it('stops trusting output timestamps once one came from the future, so the offset does not switch between the two', () => {
+    const player = preparedPlayer({
+      currentTime: 50,
+      outputLatency: 0.088,
+      stamp: { contextTime: 50 - 0.141, performanceTime: PAGE_NOW_MS + 230 }
+    })
+
+    context.stamp = { contextTime: 50 - 0.141, performanceTime: PAGE_NOW_MS - 10 }
+    player.setOffset()
+
+    expect(scheduleOffset(player)).toBeCloseTo(renderOffset(50) + 0.088, 6)
+  })
+
+  it('trusts an output timestamp a few ms ahead of the page clock, as a healthy phone gives', () => {
+    const player = preparedPlayer({
+      currentTime: 50,
+      outputLatency: 0.088,
+      stamp: { contextTime: 50 - 0.141, performanceTime: PAGE_NOW_MS + 5 }
+    })
+
+    expect(scheduleOffset(player)).toBeCloseTo(renderOffset(50) + 0.141 + 0.005, 6)
+  })
+
+  it('trusts an output timestamp up to 50 ms ahead of the page clock, and not one further ahead', () => {
+    const at = (aheadMs: number) =>
+      scheduleOffset(
+        preparedPlayer({
+          currentTime: 50,
+          outputLatency: 0.088,
+          stamp: { contextTime: 50 - 0.141, performanceTime: PAGE_NOW_MS + aheadMs }
+        })
+      )
+
+    expect(at(45)).toBeCloseTo(renderOffset(50) + 0.141 + 0.045, 6)
+    expect(at(55)).toBeCloseTo(renderOffset(50) + 0.088, 6)
+  })
+
+  it('does not take a pause right after the output timestamp was read for a stamp from the future', () => {
+    // The phone stalls for 80 ms while the stamp is read. The stamp itself is
+    // 15 ms old, measured from when it was taken.
+    let nowMs = PAGE_NOW_MS
+    const player = preparedPlayer({ currentTime: 50, outputLatency: 0.088 })
+    vi.spyOn(performance, 'now').mockImplementation(() => nowMs)
+    Object.defineProperty(context, 'stamp', {
+      get: () => {
+        nowMs += 80
+        return { contextTime: 50 - 0.141, performanceTime: nowMs - 15 }
+      }
+    })
+    Object.assign(context, { getOutputTimestamp: () => context.stamp })
+
+    player.setOffset()
+
+    const serverNowS = nowMs / 1000 + CLOCK_OFFSET_S
+    expect(scheduleOffset(player)).toBeCloseTo(serverNowS - 0.015 - (50 - 0.141), 6)
+  })
+
   it('does not trust an output timestamp from before the first sound left the speaker', () => {
     const player = preparedPlayer({
       currentTime: 50,

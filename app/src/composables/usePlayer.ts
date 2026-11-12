@@ -3,7 +3,7 @@ import { TextToSpeech } from '@capacitor-community/text-to-speech'
 import { PartialChunk, OscillatorObject, Breakpoint } from '../types/types'
 import { useMainStore } from '@/stores/MainStore'
 import type { DeviceState } from './deviceConnection'
-import { speakerOffset } from './speakerOffset'
+import { createStampReader, speakerOffset } from './speakerOffset'
 
 const BREAKPOINT_LENGTH = 0.01 // in seconds
 const AMP_MIN_VALUE = 0.000001
@@ -23,6 +23,8 @@ const oscillators: OscillatorObject[] = []
 /** How often the audio was built again because its clock had stopped. */
 let restarts = 0
 let clockWatch: ReturnType<typeof setInterval> | undefined
+/** The current audio context's output timestamps, as the schedule offset uses them. */
+let readStamp: ReturnType<typeof createStampReader>
 let offset: number
 let motion: { pos: number } = reactive({ pos: -1 })
 let outputLatencyOffset = 0
@@ -132,7 +134,12 @@ export function usePlayer() {
   }
 
   const createAudioCtx = () => {
-    ctx = new AudioContext()
+    const context = new AudioContext()
+    ctx = context
+    readStamp = createStampReader(
+      () => outputTimestamp(context),
+      () => performance.now()
+    )
 
     ctx.onstatechange = () => {
       // Resume ctx when going to sleep/background/etc preventing issue where iOS wouldn't restart playback
@@ -343,14 +350,16 @@ export function usePlayer() {
 
   const setMotionRef = (motionRef: { pos: number }) => (motion = motionRef)
 
-  const setOffset = () =>
-    (offset = speakerOffset({
+  const setOffset = () => {
+    const { stamp, pageNowMs } = readStamp()
+    offset = speakerOffset({
       serverNowS: motion.pos,
-      pageNowMs: performance.now(),
+      pageNowMs,
       renderTimeS: ctx.currentTime,
       outputLatencyS: finiteOrNull(ctx.outputLatency),
-      stamp: outputTimestamp(ctx)
-    }))
+      stamp
+    })
+  }
 
   const setTrackSettings = (wf: OscillatorType, rate: string) => {
     waveform = wf
