@@ -174,15 +174,26 @@ export function usePlayer() {
     }, CLOCK_CHECK_MS)
   }
 
-  /** Replaces the audio context with a new one. The oscillators of the old one go with it. */
+  /**
+   * Replaces the audio context with a new one. The oscillators of the old one
+   * go with it. When no new one can be made, the old one stays, so the watch
+   * tries again.
+   */
   const restartAudioCtx = () => {
     const stopped = ctx
+    try {
+      createAudioCtx()
+    } catch (error) {
+      console.warn('The audio clock stood still, and no new audio context could be made:', error)
+      return
+    }
+    // The handler acts on whichever context is current, so the old context's
+    // closing would otherwise stop the sound starting on the new one.
     stopped.onstatechange = null
     stopped.close().catch((error) => console.warn('The stopped audio context did not close:', error))
     oscillators.length = 0
     restarts++
     console.warn('The audio clock stood still while running; the audio was built again.')
-    createAudioCtx()
   }
 
   /**
@@ -291,7 +302,8 @@ export function usePlayer() {
   let fadeOutAndStopOscillatorsInterval: NodeJS.Timeout | null = null
   const startFadeOutAndStopOscillatorsInterval = () => {
     fadeOutAndStopOscillatorsInterval = setInterval(() => {
-      for (const oscObj of oscillators) {
+      // A copy, because stopping an oscillator takes it out of the list.
+      for (const oscObj of [...oscillators]) {
         const oscEndTimeReached = ctx.currentTime > startTimeInCtxTime + oscObj.endTime + outputLatencyOffset
         if (oscEndTimeReached) {
           fadeOutAndStopOscillator(oscObj)
@@ -312,7 +324,8 @@ export function usePlayer() {
   const setStartTime = (startTime: number) => (startTimeInCtxTime = startTime - offset)
 
   const stopPlayback = () => {
-    for (const oscObj of oscillators) {
+    // A copy, because stopping an oscillator takes it out of the list.
+    for (const oscObj of [...oscillators]) {
       fadeOutAndStopOscillator(oscObj)
     }
   }

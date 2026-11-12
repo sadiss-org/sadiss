@@ -3,6 +3,8 @@ vi.mock('@capacitor-community/text-to-speech', () => ({ TextToSpeech: { speak: v
 /** An audio context whose clock moves only when the test says so, as on a phone whose audio stopped. */
 class FakeAudioContext {
   static made: FakeAudioContext[] = []
+  /** Whether the next context to be made fails, as `new AudioContext()` can. */
+  static failNext = false
   state = 'running'
   currentTime = 1.6
   sampleRate = 48000
@@ -10,8 +12,13 @@ class FakeAudioContext {
   destination = {}
   closed = false
   oscillatorsMade = 0
+  oscillatorsStopped = 0
   onstatechange: (() => void) | null = null
   constructor() {
+    if (FakeAudioContext.failNext) {
+      FakeAudioContext.failNext = false
+      throw new Error('NotSupportedError')
+    }
     FakeAudioContext.made.push(this)
   }
   close = () => {
@@ -21,7 +28,15 @@ class FakeAudioContext {
   createOscillator = () => {
     this.oscillatorsMade++
     const param = { value: 0, exponentialRampToValueAtTime: vi.fn(), setValueAtTime: vi.fn() }
-    return { frequency: param, type: 'sine', connect: vi.fn(), start: vi.fn(), stop: vi.fn() }
+    return {
+      frequency: param,
+      type: 'sine',
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: () => {
+        this.oscillatorsStopped++
+      }
+    }
   }
   createGain = () => ({ gain: { value: 0, exponentialRampToValueAtTime: vi.fn(), setValueAtTime: vi.fn() }, connect: vi.fn() })
 }
@@ -85,6 +100,23 @@ describe('an audio clock that stopped', () => {
     expect(player.deviceState().audio?.restarts).toBe(1)
   })
 
+  it('is kept, and replaced at the next try, when a new audio context cannot be made', async () => {
+    const player = await preparedPlayer()
+    const stalled = latestContext()
+    FakeAudioContext.failNext = true
+
+    vi.advanceTimersByTime(3000)
+
+    expect(stalled.closed).toBe(false)
+    expect(player.deviceState().audio?.restarts).toBe(0)
+
+    vi.advanceTimersByTime(3000)
+
+    expect(stalled.closed).toBe(true)
+    expect(latestContext()).not.toBe(stalled)
+    expect(player.deviceState().audio?.restarts).toBe(1)
+  })
+
   it('is left alone while it moves', async () => {
     const player = await preparedPlayer()
     const moving = latestContext()
@@ -120,5 +152,29 @@ describe('an audio clock that stopped', () => {
     expect(latestContext()).not.toBe(stalled)
     expect(stalled.oscillatorsMade).toBe(1)
     expect(latestContext().oscillatorsMade).toBe(1)
+  })
+})
+
+describe('stopping playback', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    FakeAudioContext.made = []
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('stops every sounding oscillator', async () => {
+    const player = await preparedPlayer()
+    const breakpoints = [{ time: 0, freq: 440, amp: 0.5 }]
+    player.handleChunkData({
+      partials: [0, 1, 2, 3].map((index) => ({ index, startTime: 0, endTime: 1, breakpoints }))
+    })
+
+    player.stopPlayback()
+
+    expect(latestContext().oscillatorsStopped).toBe(4)
   })
 })
