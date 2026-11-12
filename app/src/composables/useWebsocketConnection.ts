@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core'
 import { connectDevice } from './deviceConnection'
 import { iosSpeechRate } from './iosSpeechRate'
 import { loadDeviceIdentity } from './deviceIdentity'
+import { stayAlive } from './stayAlive'
 
 const { handleChunkData, setOffset, stopPlayback, setStartTime, setTrackSettings, deviceState } = usePlayer()
 const measurement = useClockMeasurement()
@@ -21,6 +22,10 @@ export function useWebsocketConnection() {
   const establishWebsocketConnection = async () => {
     if (connecting) return
     connecting = true
+    // Started before any wait: Android refuses to start the service once the app
+    // is in the background, as when the screen locks. Not awaited, so the join
+    // never waits on the notification dialog.
+    void stayAlive()
     while (!mainStore.wsUrl) {
       console.log('waiting for ws url')
       await new Promise((resolve) => setTimeout(resolve, 10))

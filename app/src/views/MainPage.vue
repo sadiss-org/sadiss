@@ -58,7 +58,6 @@
 import { IonContent, IonPage, IonButton, useBackButton, IonSpinner } from '@ionic/vue'
 import { watch, onUnmounted, onMounted, ref } from 'vue'
 import { Capacitor } from '@capacitor/core'
-import { KeepAwake } from '@capacitor-community/keep-awake'
 import { NavigationBar } from '@capawesome/capacitor-navigation-bar'
 import { useMainStore } from '@/stores/MainStore'
 import { useWebsocketConnection } from '@/composables/useWebsocketConnection'
@@ -80,13 +79,7 @@ onMounted(async () => {
     establishWebsocketConnection()
   }
 
-  // Held for as long as the performance page is open, not only while connected:
-  // a phone that locks or is navigated away from while it reconnects stops
-  // running the app, and with it the reconnect.
   try {
-    if (Capacitor.getPlatform() !== 'web') {
-      await KeepAwake.keepAwake()
-    }
     if (Capacitor.getPlatform() === 'android') {
       await NavigationBar.hide()
     }
