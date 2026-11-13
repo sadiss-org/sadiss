@@ -29,6 +29,7 @@ const preparedPlayer = (reading: FakeContextReading) => {
         if (reading.stamp) {
           Object.assign(this, { getOutputTimestamp: () => context.stamp })
         }
+        Object.assign(this, { close: () => Promise.resolve() })
         return new Proxy(this, {
           get: (target, key) => (key in context ? context[key as keyof typeof context] : Reflect.get(target, key)),
           set: (_, key, value) => Reflect.set(context, key, value)

@@ -129,7 +129,10 @@ export function usePlayer() {
     const { audioSession } = navigator as Navigator & { audioSession?: { type: string } }
     if (audioSession) audioSession.type = 'playback'
     startKeepAlive()
-    createAudioCtx()
+    // Each join replaces the context of the one before: iOS limits how many a
+    // page holds, so one left running per join would end in silence.
+    if (ctx) replaceAudioCtx()
+    else createAudioCtx()
     watchAudioClock()
   }
 
@@ -182,23 +185,32 @@ export function usePlayer() {
   }
 
   /**
-   * Replaces the audio context with a new one. The oscillators of the old one
-   * go with it. When no new one can be made, the old one stays, so the watch
-   * tries again.
+   * Replaces the audio context with a new one and closes the old one. The
+   * oscillators of the old one go with it. When no new one can be made, the
+   * old one stays and this returns false.
    */
-  const restartAudioCtx = () => {
-    const stopped = ctx
+  const replaceAudioCtx = (): boolean => {
+    const old = ctx
     try {
       createAudioCtx()
     } catch (error) {
-      console.warn('The audio clock stood still, and no new audio context could be made:', error)
-      return
+      console.warn('No new audio context could be made:', error)
+      return false
     }
     // The handler acts on whichever context is current, so the old context's
     // closing would otherwise stop the sound starting on the new one.
-    stopped.onstatechange = null
-    stopped.close().catch((error) => console.warn('The stopped audio context did not close:', error))
+    old.onstatechange = null
+    old.close().catch((error) => console.warn('The old audio context did not close:', error))
     oscillators.length = 0
+    return true
+  }
+
+  /**
+   * Builds the audio again after its clock stood still. When no new context
+   * can be made, the old one stays, so the watch tries again.
+   */
+  const restartAudioCtx = () => {
+    if (!replaceAudioCtx()) return
     restarts++
     console.warn('The audio clock stood still while running; the audio was built again.')
   }
