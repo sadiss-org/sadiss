@@ -14,7 +14,7 @@
  * languages announces exactly that.
  */
 
-import { ClientInfoMessage, DeviceIdentity, MeasureMessage, PhoneReport } from '../types'
+import { ClientInfoMessage, DeviceIdentity, MeasureMessage, PhoneReport, PhraseReport } from '../types'
 import { logger } from '../tools'
 
 /** Client → server: an operator's interface asking to follow a performance. */
@@ -92,6 +92,29 @@ const numberOrNull = (value: unknown) => (typeof value === 'number' && Number.is
 const booleanOrNull = (value: unknown) => (typeof value === 'boolean' ? value : null)
 const textOrNull = (value: unknown) => (typeof value === 'string' && value.length <= MAX_REPORT_TEXT ? value : null)
 
+/** The most TTS phrases one report keeps; the app sends no more than this. */
+const MAX_REPORTED_PHRASES = 20
+/** The longest error a phrase report keeps; a longer one is cut to this. */
+const MAX_PHRASE_ERROR = 200
+
+const errorOrNull = (value: unknown) => (typeof value === 'string' ? value.slice(0, MAX_PHRASE_ERROR) : null)
+
+/** The phrases of a report, each read figure by figure, or null from an app that sends none. */
+const phrasesOrNull = (value: unknown): PhraseReport[] | null =>
+  Array.isArray(value)
+    ? value
+        .filter(isFrame)
+        .slice(0, MAX_REPORTED_PHRASES)
+        .map((phrase) => ({
+          trackTimeS: numberOrNull(phrase.trackTimeS),
+          lang: textOrNull(phrase.lang),
+          rate: numberOrNull(phrase.rate),
+          askedLateMs: numberOrNull(phrase.askedLateMs),
+          tookMs: numberOrNull(phrase.tookMs),
+          error: errorOrNull(phrase.error)
+        }))
+    : null
+
 /** A part of a report read with `read`, or null when the phone sent no object for it. */
 const partOrNull = <T>(value: unknown, read: (part: Frame) => T): T | null => (isFrame(value) ? read(value) : null)
 
@@ -123,7 +146,8 @@ const readPhoneReport = (value: unknown): PhoneReport | undefined => {
     })),
     visible: booleanOrNull(value.visible),
     keepAlivePlaying: booleanOrNull(value.keepAlivePlaying),
-    lastChunk: partOrNull(value.lastChunk, (chunk) => ({ index: numberOrNull(chunk.index), leadMs: numberOrNull(chunk.leadMs) }))
+    lastChunk: partOrNull(value.lastChunk, (chunk) => ({ index: numberOrNull(chunk.index), leadMs: numberOrNull(chunk.leadMs) })),
+    tts: phrasesOrNull(value.tts)
   }
 }
 

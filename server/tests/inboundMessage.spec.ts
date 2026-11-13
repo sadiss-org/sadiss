@@ -145,7 +145,11 @@ describe('reading a frame as one of our messages', () => {
       },
       visible: false,
       keepAlivePlaying: true,
-      lastChunk: { index: 7, leadMs: 912.4 }
+      lastChunk: { index: 7, leadMs: 912.4 },
+      tts: [
+        { trackTimeS: 4, lang: 'de-DE', rate: 1, askedLateMs: 42.5, tookMs: 1800, error: null },
+        { trackTimeS: 9, lang: null, rate: 1, askedLateMs: 30, tookMs: 2, error: 'This language is not supported.' }
+      ]
     }
 
     it('keeps the report a phone sends with it', () => {
@@ -153,7 +157,7 @@ describe('reading a frame as one of our messages', () => {
     })
 
     it('keeps a report whose figures the phone could not give', () => {
-      const unknown = { clock: null, audio: null, visible: null, keepAlivePlaying: null, lastChunk: null }
+      const unknown = { clock: null, audio: null, visible: null, keepAlivePlaying: null, lastChunk: null, tts: null }
       expect(read({ message: 'measure', t0: 5, report: unknown })).toEqual({ message: 'measure', t0: 5, report: unknown })
     })
 
@@ -175,6 +179,26 @@ describe('reading a frame as one of our messages', () => {
         report: { visible: null, clock: { rttMs: null, offsetMs: 12.5 }, audio: { state: null } }
       })
       expect(parsed).not.toHaveProperty('report.extra')
+    })
+
+    it('reads the phrases of an app that reports none as unknown', () => {
+      const { tts: _, ...withoutPhrases } = report
+      expect(read({ message: 'measure', t0: 5, report: withoutPhrases })).toMatchObject({ report: { tts: null } })
+    })
+
+    it('keeps at most 20 phrases, and drops those that are not objects', () => {
+      const phrase = report.tts[0]
+      const parsed = read({ message: 'measure', t0: 5, report: { ...report, tts: ['spoken', ...Array(30).fill(phrase)] } })
+      expect(parsed).toMatchObject({ report: { tts: Array(20).fill(phrase) } })
+    })
+
+    it("reads a phrase's figures of the wrong kind as unknown, and shortens a long error", () => {
+      const parsed = read({
+        message: 'measure',
+        t0: 5,
+        report: { ...report, tts: [{ ...report.tts[0], tookMs: 'long', lang: 'x'.repeat(500), error: 'e'.repeat(1000) }] }
+      })
+      expect(parsed).toMatchObject({ report: { tts: [{ trackTimeS: 4, tookMs: null, lang: null, error: 'e'.repeat(200) }] } })
     })
 
     it('answers a ping whose report is not an object, without the report', () => {

@@ -11,7 +11,7 @@ import { DeviceConnectionOptions, DeviceState } from '@/composables/deviceConnec
 
 const connect = (
   intervalMs = 3000,
-  extra: { deviceState?: () => DeviceState; onChunk?: DeviceConnectionOptions['onChunk'] } = {},
+  extra: Pick<DeviceConnectionOptions, 'deviceState' | 'onChunk' | 'takePhraseReports'> = {},
   now = () => 0
 ) => {
   const playback: unknown[] = []
@@ -139,8 +139,20 @@ describe('the connection a phone keeps to the server', () => {
       audio: null,
       visible: null,
       keepAlivePlaying: null,
-      lastChunk: { index: 3, leadMs: 1000 }
+      lastChunk: { index: 3, leadMs: 1000 },
+      tts: null
     })
+  })
+
+  it('hands the phrases finished since the last report over with the next one', () => {
+    const phrase = { trackTimeS: 4, lang: 'de-DE', rate: 1, askedLateMs: 20, tookMs: 900, error: null }
+    let finished = [phrase]
+    const { report } = connect(3000, { takePhraseReports: () => finished.splice(0) })
+    latestSocket().open()
+
+    expect(report()).toMatchObject({ tts: [phrase] })
+    finished = []
+    expect(report()).toMatchObject({ tts: [] })
   })
 
   it('adds what the app knows about its audio and screen to the report', () => {

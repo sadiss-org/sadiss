@@ -547,7 +547,14 @@ describe('the performance log file', () => {
       })
     )
     await waitForRecords(performanceId, 1)
-    const report = { clock: null, audio: null, visible: true, keepAlivePlaying: true, lastChunk: { index: 2, leadMs: 850 } }
+    const report = {
+      clock: null,
+      audio: null,
+      visible: true,
+      keepAlivePlaying: true,
+      lastChunk: { index: 2, leadMs: 850 },
+      tts: [{ trackTimeS: 4, lang: 'de-DE', rate: 1, askedLateMs: 40, tookMs: 1800, error: null }]
+    }
 
     device.ws.send(JSON.stringify({ message: 'measure', t0: 42, report }))
 

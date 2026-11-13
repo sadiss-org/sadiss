@@ -2,7 +2,7 @@ import { ClientInfoMessage, buildClientInfoMessage } from './protocol'
 import { createResilientSocket } from './resilientSocket'
 import { ClockSync } from './clockSync'
 import { chunkLeadMs, chunkTiming } from './chunkTiming'
-import { PhoneReport } from '@/types/measurement'
+import { PhoneReport, PhraseReport } from '@/types/measurement'
 import { ChunkEnvelope } from '@/types/types'
 
 /**
@@ -47,6 +47,8 @@ export interface DeviceConnectionOptions {
   log?: (raw: string) => void
   /** The phone's audio and screen state, for the report it sends when the server asks. */
   deviceState?: () => DeviceState
+  /** The TTS phrases finished since it was last called, for the report; a device that speaks none leaves it out. */
+  takePhraseReports?: () => PhraseReport[]
   /**
    * Called with every chunk message after playback has it, and the chunk's
    * number and how early it came by the phone's clock, or null for a chunk
@@ -71,6 +73,7 @@ export const connectDevice = ({
   onLiveChange,
   log,
   deviceState = () => NO_DEVICE_STATE,
+  takePhraseReports,
   onChunk,
   WebSocketImpl
 }: DeviceConnectionOptions) => {
@@ -85,7 +88,8 @@ export const connectDevice = ({
     return {
       clock: estimate && { ...estimate, connectedForMs: now() - openedAt },
       ...deviceState(),
-      lastChunk
+      lastChunk,
+      tts: takePhraseReports ? takePhraseReports() : null
     }
   }
 

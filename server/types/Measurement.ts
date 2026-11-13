@@ -56,6 +56,23 @@ export interface PhoneReport {
   visible: boolean | null
   keepAlivePlaying: boolean | null
   lastChunk: { index: number | null; leadMs: number | null } | null
+  /** The TTS phrases the phone finished since its last report, or null from an app that reports none. */
+  tts: PhraseReport[] | null
+}
+
+/** How one TTS phrase went on a phone. */
+export interface PhraseReport {
+  /** When the phrase is due in the track, in s. */
+  trackTimeS: number | null
+  /** The language it was spoken in, or null for the engine's default voice. */
+  lang: string | null
+  rate: number | null
+  /** How long after it was due by the phone's audio clock the phone asked its engine to speak, in ms. */
+  askedLateMs: number | null
+  /** How long the engine took from being asked until it said it was done or failed, in ms. */
+  tookMs: number | null
+  /** Why the engine did not speak it, or null when it did. */
+  error: string | null
 }
 
 /** Server → client: the ping echoed back with server clock stamps. */

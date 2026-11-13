@@ -8,7 +8,7 @@ import { iosSpeechRate } from './iosSpeechRate'
 import { loadDeviceIdentity } from './deviceIdentity'
 import { stayAlive } from './stayAlive'
 
-const { handleChunkData, setOffset, stopPlayback, setStartTime, setTrackSettings, deviceState } = usePlayer()
+const { handleChunkData, setOffset, stopPlayback, setStartTime, setTrackSettings, deviceState, takePhraseReports } = usePlayer()
 const measurement = useClockMeasurement()
 
 /** Whether the server is being heard from. */
@@ -43,6 +43,7 @@ export function useWebsocketConnection() {
       }),
       clockSync: measurement,
       deviceState,
+      takePhraseReports,
       onPlayback: handlePlayback,
       log: (raw) => console.log(raw),
       // Playback is left alone when the connection goes: what is already
