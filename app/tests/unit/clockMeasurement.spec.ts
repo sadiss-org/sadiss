@@ -48,12 +48,46 @@ describe('clock sync across connections', () => {
 
     measurement.start((message) => first.push(message))
     measurement.handleMessage(configuredEvery(3000))
+    const sentBeforeReplacing = first.length
     measurement.start((message) => second.push(message))
     measurement.handleMessage(configuredEvery(3000))
 
     vi.advanceTimersByTime(3000)
 
-    expect(first).toHaveLength(0)
-    expect(second).toHaveLength(1)
+    expect(first).toHaveLength(sentBeforeReplacing)
+    expect(second).toHaveLength(2)
+  })
+
+  it('knows the server clock as soon as the first reply comes back, without waiting an interval', async () => {
+    const { useClockMeasurement } = await import('@/composables/useClockMeasurement')
+    const measurement = useClockMeasurement()
+    const sent: MeasureMessage[] = []
+
+    measurement.start((message) => sent.push(message))
+    measurement.handleMessage(configuredEvery(3000))
+    vi.advanceTimersByTime(50)
+    measurement.handleMessage(answering(sent[0]))
+
+    expect(motion.pos).not.toBe(-1)
+  })
+
+  it('keeps pinging once per interval when replies arrive between pings', async () => {
+    const { useClockMeasurement } = await import('@/composables/useClockMeasurement')
+    const measurement = useClockMeasurement()
+    const sentAt: number[] = []
+    const sent: MeasureMessage[] = []
+    const startedAt = Date.now()
+
+    measurement.start((message) => {
+      sent.push(message)
+      sentAt.push(Date.now() - startedAt)
+    })
+    measurement.handleMessage(configuredEvery(3000))
+    vi.advanceTimersByTime(3000)
+    vi.advanceTimersByTime(100)
+    measurement.handleMessage(answering(sent[sent.length - 1]))
+    vi.advanceTimersByTime(2900)
+
+    expect(sentAt).toEqual([0, 3000, 6000])
   })
 })
