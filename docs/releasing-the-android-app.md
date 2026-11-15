@@ -112,8 +112,10 @@ locks, and the phone drops out of the piece. The service and its permissions are
 declared by the local plugin in `app/plugins/playback-service/`.
 
 Play asks every app that targets Android 14 or later to declare its foreground
-service types. Do this once the locked-phone test has passed and before uploading
-the bundle that first contains the service:
+service types. Do this once the locked-phone test has passed and before sending the
+first production release that contains the service for review, so that the
+declaration is part of that review. Uploading the bundle to internal testing
+before the declaration exists is fine:
 
 1. Film the app in use with a second phone or a camera; a screen recording goes black
    when the screen locks. In one take: open SADISS, scan a performance QR code, the
@@ -124,18 +126,12 @@ the bundle that first contains the service:
 3. Play Console → the app → **App content** (Google's help page puts it under
    *Monitor and improve* → *App content*; the console may label it *Policy* →
    *App content*) → the **foreground service** declaration.
-4. Tick the use case **Media Playback** and fill in:
-   - Description: "SADISS turns audience phones into speakers for a live
-     performance. After the user joins a performance by scanning its QR code, the
-     phone plays its part of the piece as audio streamed from the performance
-     server. The foreground service keeps that audio playing when the user locks
-     the screen or puts the phone in a pocket."
-   - Impact if deferred or interrupted: "The phone goes silent in the middle of the
-     performance and drops out of the piece; the user has to unlock the phone and
-     rejoin."
-   - The video link.
-5. Submit the declaration before uploading the bundle. Google's page does not say
-   whether a missing declaration blocks the release.
+4. Tick the use case **Media Playback** (German console: *Medienwiedergabe*) and
+   paste the video link. The form asks for nothing else.
+5. Save. The declaration is not sent on its own: *Publishing overview*
+   (*Veröffentlichungsübersicht*) lists it under *Deine Angaben* as "Erklärung zu
+   Diensten im Vordergrund aktualisiert", and Google reviews it with the next
+   production release sent for review.
 
 Google's requirements:
 https://support.google.com/googleplay/android-developer/answer/13392821
