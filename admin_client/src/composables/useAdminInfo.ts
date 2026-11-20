@@ -1,5 +1,6 @@
 import { onScopeDispose, readonly, ref, Ref } from "vue"
 import AdminInfo from "../types/AdminInfo"
+import { wsUrl } from "../utils/serverUrls"
 import { createResilientSocket } from "./resilientSocket"
 
 /**
@@ -41,7 +42,7 @@ const subscribe = (performanceId?: string): Subscription => {
   const live = ref(false)
 
   const socket = createResilientSocket({
-    url: import.meta.env.VITE_APP_WS_URL,
+    url: wsUrl(),
     onOpen: send => send(registration(performanceId)),
     onMessage: data => {
       const received = readAdminInfo(data)

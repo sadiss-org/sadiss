@@ -34,7 +34,7 @@ if (!fs.existsSync(process.env.CHUNKS_DIR!)) {
   console.log('Directory created: ', process.env.CHUNKS_DIR)
 }
 
-let whitelist = ['https://sadiss.net']
+let whitelist = ['https://sadiss.net', 'https://fallback.sadiss.net']
 
 if (process.env.NODE_ENV === 'development') {
   whitelist = whitelist.concat([

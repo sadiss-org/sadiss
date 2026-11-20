@@ -1,11 +1,12 @@
 import type { QrCodeData } from "../types"
 import { downloadZip } from "client-zip"
 import { ref } from "vue"
+import { wsUrl } from "../utils/serverUrls"
 
 export function useQrCodeGenerator() {
   const qrCodeData = ref<QrCodeData[]>([])
 
-  const wsServerUrl = import.meta.env.VITE_APP_WS_URL
+  const wsServerUrl = wsUrl()
 
   const generateQrCodes = async (
     voiceCount: number,
