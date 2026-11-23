@@ -1,0 +1,2615 @@
+{
+  "serverCommit": "027343221e35e408f40e0306916128dceb0b426b",
+  "loadtestCommit": "317d694553dcb84ec4193adfff76284d277ac6bf",
+  "target": {
+    "apiUrl": "https://sadiss.net/capacity/server",
+    "wsUrl": "wss://sadiss.net/capacity/ws/"
+  },
+  "runAt": "2026-11-23T17:34:10.062Z",
+  "note": null,
+  "generator": {
+    "cpu": "AMD Ryzen 7 8845HS w/ Radeon 780M Graphics",
+    "threads": 16,
+    "node": "v22.23.5",
+    "platform": "linux"
+  },
+  "ramp": {
+    "start": 25,
+    "step": 25
+  },
+  "steps": [
+    {
+      "result": {
+        "phones": 25,
+        "latePhones": 3,
+        "track": {
+          "seconds": 30,
+          "partialsPerFrame": 16,
+          "choir": false,
+          "tts": null
+        },
+        "chunkCount": 30,
+        "arrivalLeadMs": {
+          "count": 735,
+          "min": 929.612548828125,
+          "median": 938.075928,
+          "p1": 933.221846,
+          "p95": 941.298804,
+          "p99": 942.101206,
+          "max": 942.98046875
+        },
+        "arrivalsWithoutClock": 0,
+        "missingChunks": 0,
+        "connects": 25,
+        "dropsDuringTrack": 0,
+        "dropsBeforeTrack": 0,
+        "roundTripMs": {
+          "count": 749,
+          "min": 17.2830399999948,
+          "median": 21.932312,
+          "p1": 17.555299,
+          "p95": 24.92099,
+          "p99": 27.076431,
+          "max": 70.3470410000009
+        },
+        "roundTripsAtStart": {
+          "count": 22,
+          "min": 21,
+          "median": 21,
+          "p1": 21,
+          "p95": 22,
+          "p99": 22,
+          "max": 22
+        },
+        "offsetFromMedianMs": {
+          "count": 748,
+          "min": 0,
+          "median": 0.112061,
+          "p1": 0.001221,
+          "p95": 0.430945,
+          "p99": 1.124229,
+          "max": 1.273193359375
+        },
+        "lateOffsetFromMedianMs": {
+          "count": 87,
+          "min": 0.0078125,
+          "median": 0.249023,
+          "p1": 0.014111,
+          "p95": 1.385938,
+          "p99": 1.743638,
+          "max": 1.758544921875
+        },
+        "phraseLeadMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p1": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "phrasesWithoutClock": 0,
+        "missingPhrases": 0,
+        "wrongPhrases": 0,
+        "generatorDelayMs": {
+          "p99": 1.502,
+          "max": 2.124
+        },
+        "serverCpuPct": {
+          "count": 19,
+          "min": 0.6,
+          "median": 0.99,
+          "p1": 0.6,
+          "p95": 1.81,
+          "p99": 1.954,
+          "max": 1.99
+        },
+        "serverRssMb": {
+          "count": 20,
+          "min": 113.18,
+          "median": 113.44,
+          "p1": 113.218,
+          "p95": 116.1005,
+          "p99": 116.1081,
+          "max": 116.11
+        },
+        "serverSockets": {
+          "count": 20,
+          "min": 13,
+          "median": 32,
+          "p1": 16.61,
+          "p95": 35,
+          "p99": 35,
+          "max": 35
+        },
+        "serverRestarts": 0,
+        "boxLoad": {
+          "count": 20,
+          "min": 0,
+          "median": 0.045,
+          "p1": 0,
+          "p95": 0.0905,
+          "p99": 0.0981,
+          "max": 0.1
+        },
+        "boxAvailableMb": {
+          "count": 20,
+          "min": 6079.8,
+          "median": 6095.78,
+          "p1": 6080.9077,
+          "p95": 6099.56,
+          "p99": 6099.56,
+          "max": 6099.56
+        }
+      },
+      "verdict": {
+        "outcome": "pass",
+        "checks": [
+          {
+            "threshold": {
+              "figure": "arrivalLeadMs",
+              "statistic": "p1",
+              "bound": "atLeast",
+              "limit": 500,
+              "consequence": "fail"
+            },
+            "value": 933.221846,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "missingChunks",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "dropsDuringTrack",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "offsetFromMedianMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 10,
+              "consequence": "fail"
+            },
+            "value": 1.124229,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "generatorDelayMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 20,
+              "consequence": "invalid",
+              "reason": "the load generator fell behind, so this run says nothing about the server."
+            },
+            "value": 1.502,
+            "passed": true
+          }
+        ],
+        "invalidBecause": []
+      },
+      "serverSamples": [
+        {
+          "atS": 0.605,
+          "pid": 250448,
+          "cpuPct": null,
+          "rssMb": 113.18,
+          "sockets": 13,
+          "boxLoad": 0,
+          "boxAvailableMb": 6079.8
+        },
+        {
+          "atS": 5.647,
+          "pid": 250448,
+          "cpuPct": 1.79,
+          "rssMb": 113.38,
+          "sockets": 32,
+          "boxLoad": 0,
+          "boxAvailableMb": 6085.63
+        },
+        {
+          "atS": 10.681,
+          "pid": 250448,
+          "cpuPct": 0.79,
+          "rssMb": 113.38,
+          "sockets": 32,
+          "boxLoad": 0,
+          "boxAvailableMb": 6085.68
+        },
+        {
+          "atS": 15.722,
+          "pid": 250448,
+          "cpuPct": 0.6,
+          "rssMb": 113.38,
+          "sockets": 32,
+          "boxLoad": 0.08,
+          "boxAvailableMb": 6092.05
+        },
+        {
+          "atS": 20.792,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 113.4,
+          "sockets": 32,
+          "boxLoad": 0.07,
+          "boxAvailableMb": 6095.8
+        },
+        {
+          "atS": 25.854,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 113.4,
+          "sockets": 32,
+          "boxLoad": 0.07,
+          "boxAvailableMb": 6095.57
+        },
+        {
+          "atS": 30.911,
+          "pid": 250448,
+          "cpuPct": 0.79,
+          "rssMb": 113.4,
+          "sockets": 32,
+          "boxLoad": 0.06,
+          "boxAvailableMb": 6095.32
+        },
+        {
+          "atS": 35.953,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 113.4,
+          "sockets": 32,
+          "boxLoad": 0.06,
+          "boxAvailableMb": 6096
+        },
+        {
+          "atS": 40.989,
+          "pid": 250448,
+          "cpuPct": 0.6,
+          "rssMb": 113.4,
+          "sockets": 32,
+          "boxLoad": 0.05,
+          "boxAvailableMb": 6095.78
+        },
+        {
+          "atS": 46.031,
+          "pid": 250448,
+          "cpuPct": 0.79,
+          "rssMb": 113.44,
+          "sockets": 32,
+          "boxLoad": 0.05,
+          "boxAvailableMb": 6095.78
+        },
+        {
+          "atS": 51.067,
+          "pid": 250448,
+          "cpuPct": 0.79,
+          "rssMb": 113.44,
+          "sockets": 32,
+          "boxLoad": 0.04,
+          "boxAvailableMb": 6095.89
+        },
+        {
+          "atS": 56.095,
+          "pid": 250448,
+          "cpuPct": 0.8,
+          "rssMb": 113.44,
+          "sockets": 32,
+          "boxLoad": 0.04,
+          "boxAvailableMb": 6095.92
+        },
+        {
+          "atS": 61.149,
+          "pid": 250448,
+          "cpuPct": 0.79,
+          "rssMb": 113.44,
+          "sockets": 32,
+          "boxLoad": 0.04,
+          "boxAvailableMb": 6095.63
+        },
+        {
+          "atS": 66.186,
+          "pid": 250448,
+          "cpuPct": 1.99,
+          "rssMb": 116.04,
+          "sockets": 33,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6093.9
+        },
+        {
+          "atS": 71.23,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 116.06,
+          "sockets": 34,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6094.5
+        },
+        {
+          "atS": 76.272,
+          "pid": 250448,
+          "cpuPct": 1.59,
+          "rssMb": 116.07,
+          "sockets": 35,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6099.56
+        },
+        {
+          "atS": 81.309,
+          "pid": 250448,
+          "cpuPct": 1.59,
+          "rssMb": 116.07,
+          "sockets": 35,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6099.56
+        },
+        {
+          "atS": 86.369,
+          "pid": 250448,
+          "cpuPct": 1.38,
+          "rssMb": 116.1,
+          "sockets": 35,
+          "boxLoad": 0.1,
+          "boxAvailableMb": 6097.72
+        },
+        {
+          "atS": 91.42,
+          "pid": 250448,
+          "cpuPct": 1.58,
+          "rssMb": 116.1,
+          "sockets": 35,
+          "boxLoad": 0.09,
+          "boxAvailableMb": 6097.47
+        },
+        {
+          "atS": 96.453,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 116.11,
+          "sockets": 35,
+          "boxLoad": 0.09,
+          "boxAvailableMb": 6097.47
+        }
+      ],
+      "notSampledBecause": null
+    },
+    {
+      "result": {
+        "phones": 50,
+        "latePhones": 5,
+        "track": {
+          "seconds": 30,
+          "partialsPerFrame": 16,
+          "choir": false,
+          "tts": null
+        },
+        "chunkCount": 30,
+        "arrivalLeadMs": {
+          "count": 1470,
+          "min": 963.145751953125,
+          "median": 975.216064,
+          "p1": 967.391094,
+          "p95": 979.031274,
+          "p99": 980.155708,
+          "max": 980.975341796875
+        },
+        "arrivalsWithoutClock": 0,
+        "missingChunks": 0,
+        "connects": 50,
+        "dropsDuringTrack": 0,
+        "dropsBeforeTrack": 0,
+        "roundTripMs": {
+          "count": 1513,
+          "min": 17.101384000008693,
+          "median": 21.965569,
+          "p1": 17.537285,
+          "p95": 25.270507,
+          "p99": 28.594997,
+          "max": 52.12010399997234
+        },
+        "roundTripsAtStart": {
+          "count": 45,
+          "min": 18,
+          "median": 21,
+          "p1": 18,
+          "p95": 22,
+          "p99": 22,
+          "max": 22
+        },
+        "offsetFromMedianMs": {
+          "count": 1530,
+          "min": 0,
+          "median": 0.086182,
+          "p1": 0,
+          "p95": 0.388184,
+          "p99": 1.153281,
+          "max": 1.30712890625
+        },
+        "lateOffsetFromMedianMs": {
+          "count": 140,
+          "min": 0.0029296875,
+          "median": 0.269165,
+          "p1": 0.004395,
+          "p95": 1.200732,
+          "p99": 1.405298,
+          "max": 1.411865234375
+        },
+        "phraseLeadMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p1": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "phrasesWithoutClock": 0,
+        "missingPhrases": 0,
+        "wrongPhrases": 0,
+        "generatorDelayMs": {
+          "p99": 1.534,
+          "max": 2.198
+        },
+        "serverCpuPct": {
+          "count": 19,
+          "min": 0.79,
+          "median": 1.38,
+          "p1": 0.79,
+          "p95": 2.128,
+          "p99": 3.1216,
+          "max": 3.37
+        },
+        "serverRssMb": {
+          "count": 20,
+          "min": 116.16,
+          "median": 116.63,
+          "p1": 116.2455,
+          "p95": 116.67,
+          "p99": 116.67,
+          "max": 116.67
+        },
+        "serverSockets": {
+          "count": 20,
+          "min": 19,
+          "median": 55,
+          "p1": 25.46,
+          "p95": 60,
+          "p99": 60,
+          "max": 60
+        },
+        "serverRestarts": 0,
+        "boxLoad": {
+          "count": 20,
+          "min": 0.04,
+          "median": 0.065,
+          "p1": 0.04,
+          "p95": 0.1005,
+          "p99": 0.1081,
+          "max": 0.11
+        },
+        "boxAvailableMb": {
+          "count": 20,
+          "min": 6078.18,
+          "median": 6090.26,
+          "p1": 6079.7627,
+          "p95": 6091.384,
+          "p99": 6091.7488,
+          "max": 6091.84
+        }
+      },
+      "verdict": {
+        "outcome": "pass",
+        "checks": [
+          {
+            "threshold": {
+              "figure": "arrivalLeadMs",
+              "statistic": "p1",
+              "bound": "atLeast",
+              "limit": 500,
+              "consequence": "fail"
+            },
+            "value": 967.391094,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "missingChunks",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "dropsDuringTrack",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "offsetFromMedianMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 10,
+              "consequence": "fail"
+            },
+            "value": 1.153281,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "generatorDelayMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 20,
+              "consequence": "invalid",
+              "reason": "the load generator fell behind, so this run says nothing about the server."
+            },
+            "value": 1.534,
+            "passed": true
+          }
+        ],
+        "invalidBecause": []
+      },
+      "serverSamples": [
+        {
+          "atS": 1.049,
+          "pid": 250448,
+          "cpuPct": null,
+          "rssMb": 116.16,
+          "sockets": 19,
+          "boxLoad": 0.09,
+          "boxAvailableMb": 6078.18
+        },
+        {
+          "atS": 6.102,
+          "pid": 250448,
+          "cpuPct": 3.37,
+          "rssMb": 116.61,
+          "sockets": 53,
+          "boxLoad": 0.08,
+          "boxAvailableMb": 6086.82
+        },
+        {
+          "atS": 11.158,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 116.61,
+          "sockets": 53,
+          "boxLoad": 0.07,
+          "boxAvailableMb": 6090.82
+        },
+        {
+          "atS": 16.189,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 116.61,
+          "sockets": 55,
+          "boxLoad": 0.07,
+          "boxAvailableMb": 6090.36
+        },
+        {
+          "atS": 21.226,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 116.61,
+          "sockets": 55,
+          "boxLoad": 0.06,
+          "boxAvailableMb": 6091.84
+        },
+        {
+          "atS": 26.282,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 116.61,
+          "sockets": 55,
+          "boxLoad": 0.06,
+          "boxAvailableMb": 6091.36
+        },
+        {
+          "atS": 31.31,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 116.61,
+          "sockets": 55,
+          "boxLoad": 0.05,
+          "boxAvailableMb": 6091.36
+        },
+        {
+          "atS": 36.369,
+          "pid": 250448,
+          "cpuPct": 1.58,
+          "rssMb": 116.63,
+          "sockets": 55,
+          "boxLoad": 0.05,
+          "boxAvailableMb": 6091.36
+        },
+        {
+          "atS": 41.414,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 116.63,
+          "sockets": 55,
+          "boxLoad": 0.04,
+          "boxAvailableMb": 6091.36
+        },
+        {
+          "atS": 46.452,
+          "pid": 250448,
+          "cpuPct": 0.79,
+          "rssMb": 116.63,
+          "sockets": 55,
+          "boxLoad": 0.04,
+          "boxAvailableMb": 6091.36
+        },
+        {
+          "atS": 51.516,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 116.63,
+          "sockets": 55,
+          "boxLoad": 0.11,
+          "boxAvailableMb": 6090.89
+        },
+        {
+          "atS": 56.551,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 116.63,
+          "sockets": 55,
+          "boxLoad": 0.1,
+          "boxAvailableMb": 6090.64
+        },
+        {
+          "atS": 61.585,
+          "pid": 250448,
+          "cpuPct": 0.79,
+          "rssMb": 116.63,
+          "sockets": 55,
+          "boxLoad": 0.09,
+          "boxAvailableMb": 6090.16
+        },
+        {
+          "atS": 66.649,
+          "pid": 250448,
+          "cpuPct": 1.58,
+          "rssMb": 116.65,
+          "sockets": 56,
+          "boxLoad": 0.08,
+          "boxAvailableMb": 6089.92
+        },
+        {
+          "atS": 71.693,
+          "pid": 250448,
+          "cpuPct": 1.78,
+          "rssMb": 116.66,
+          "sockets": 58,
+          "boxLoad": 0.08,
+          "boxAvailableMb": 6089.21
+        },
+        {
+          "atS": 76.727,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 116.66,
+          "sockets": 59,
+          "boxLoad": 0.07,
+          "boxAvailableMb": 6089.22
+        },
+        {
+          "atS": 81.762,
+          "pid": 250448,
+          "cpuPct": 1.99,
+          "rssMb": 116.66,
+          "sockets": 60,
+          "boxLoad": 0.06,
+          "boxAvailableMb": 6088.29
+        },
+        {
+          "atS": 86.819,
+          "pid": 250448,
+          "cpuPct": 1.98,
+          "rssMb": 116.67,
+          "sockets": 60,
+          "boxLoad": 0.06,
+          "boxAvailableMb": 6086.51
+        },
+        {
+          "atS": 91.847,
+          "pid": 250448,
+          "cpuPct": 1.59,
+          "rssMb": 116.67,
+          "sockets": 60,
+          "boxLoad": 0.05,
+          "boxAvailableMb": 6089.75
+        },
+        {
+          "atS": 96.906,
+          "pid": 250448,
+          "cpuPct": 1.38,
+          "rssMb": 116.67,
+          "sockets": 60,
+          "boxLoad": 0.05,
+          "boxAvailableMb": 6089.29
+        }
+      ],
+      "notSampledBecause": null
+    },
+    {
+      "result": {
+        "phones": 75,
+        "latePhones": 8,
+        "track": {
+          "seconds": 30,
+          "partialsPerFrame": 16,
+          "choir": false,
+          "tts": null
+        },
+        "chunkCount": 30,
+        "arrivalLeadMs": {
+          "count": 2201,
+          "min": 948.68017578125,
+          "median": 969.690186,
+          "p1": 963.046143,
+          "p95": 973.844727,
+          "p99": 975.237793,
+          "max": 977.44677734375
+        },
+        "arrivalsWithoutClock": 0,
+        "missingChunks": 0,
+        "connects": 75,
+        "dropsDuringTrack": 0,
+        "dropsBeforeTrack": 0,
+        "roundTripMs": {
+          "count": 2264,
+          "min": 16.90848799998639,
+          "median": 21.939683,
+          "p1": 17.362978,
+          "p95": 26.141643,
+          "p99": 29.72045,
+          "max": 95.006018999964
+        },
+        "roundTripsAtStart": {
+          "count": 67,
+          "min": 20,
+          "median": 21,
+          "p1": 20.66,
+          "p95": 22,
+          "p99": 22,
+          "max": 22
+        },
+        "offsetFromMedianMs": {
+          "count": 2278,
+          "min": 0,
+          "median": 0.114258,
+          "p1": 0,
+          "p95": 0.385254,
+          "p99": 0.635356,
+          "max": 1.119873046875
+        },
+        "lateOffsetFromMedianMs": {
+          "count": 222,
+          "min": 0.005859375,
+          "median": 0.234741,
+          "p1": 0.010942,
+          "p95": 1.082593,
+          "p99": 1.693674,
+          "max": 1.7578125
+        },
+        "phraseLeadMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p1": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "phrasesWithoutClock": 0,
+        "missingPhrases": 0,
+        "wrongPhrases": 0,
+        "generatorDelayMs": {
+          "p99": 1.715,
+          "max": 2.55
+        },
+        "serverCpuPct": {
+          "count": 19,
+          "min": 0.99,
+          "median": 1.39,
+          "p1": 0.99,
+          "p95": 2.519,
+          "p99": 3.5198,
+          "max": 3.77
+        },
+        "serverRssMb": {
+          "count": 20,
+          "min": 116.7,
+          "median": 116.97,
+          "p1": 116.7,
+          "p95": 117.06,
+          "p99": 117.06,
+          "max": 117.06
+        },
+        "serverSockets": {
+          "count": 20,
+          "min": 28,
+          "median": 77,
+          "p1": 37.31,
+          "p95": 85,
+          "p99": 85,
+          "max": 85
+        },
+        "serverRestarts": 0,
+        "boxLoad": {
+          "count": 20,
+          "min": 0.01,
+          "median": 0.02,
+          "p1": 0.01,
+          "p95": 0.0405,
+          "p99": 0.0481,
+          "max": 0.05
+        },
+        "boxAvailableMb": {
+          "count": 20,
+          "min": 6066.14,
+          "median": 6084.215,
+          "p1": 6068.3174,
+          "p95": 6085.1235,
+          "p99": 6087.6087,
+          "max": 6088.23
+        }
+      },
+      "verdict": {
+        "outcome": "pass",
+        "checks": [
+          {
+            "threshold": {
+              "figure": "arrivalLeadMs",
+              "statistic": "p1",
+              "bound": "atLeast",
+              "limit": 500,
+              "consequence": "fail"
+            },
+            "value": 963.046143,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "missingChunks",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "dropsDuringTrack",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "offsetFromMedianMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 10,
+              "consequence": "fail"
+            },
+            "value": 0.635356,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "generatorDelayMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 20,
+              "consequence": "invalid",
+              "reason": "the load generator fell behind, so this run says nothing about the server."
+            },
+            "value": 1.715,
+            "passed": true
+          }
+        ],
+        "invalidBecause": []
+      },
+      "serverSamples": [
+        {
+          "atS": 1.392,
+          "pid": 250448,
+          "cpuPct": null,
+          "rssMb": 116.7,
+          "sockets": 28,
+          "boxLoad": 0.05,
+          "boxAvailableMb": 6066.14
+        },
+        {
+          "atS": 6.431,
+          "pid": 250448,
+          "cpuPct": 3.77,
+          "rssMb": 116.7,
+          "sockets": 77,
+          "boxLoad": 0.04,
+          "boxAvailableMb": 6077.6
+        },
+        {
+          "atS": 11.473,
+          "pid": 250448,
+          "cpuPct": 1.59,
+          "rssMb": 116.85,
+          "sockets": 77,
+          "boxLoad": 0.04,
+          "boxAvailableMb": 6083.63
+        },
+        {
+          "atS": 16.538,
+          "pid": 250448,
+          "cpuPct": 1.38,
+          "rssMb": 116.86,
+          "sockets": 77,
+          "boxLoad": 0.04,
+          "boxAvailableMb": 6084.96
+        },
+        {
+          "atS": 21.582,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 116.86,
+          "sockets": 77,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6084.72
+        },
+        {
+          "atS": 26.622,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 116.86,
+          "sockets": 77,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6084.47
+        },
+        {
+          "atS": 31.683,
+          "pid": 250448,
+          "cpuPct": 1.38,
+          "rssMb": 116.97,
+          "sockets": 77,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6084.38
+        },
+        {
+          "atS": 36.72,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 116.97,
+          "sockets": 77,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6084.23
+        },
+        {
+          "atS": 41.754,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 116.97,
+          "sockets": 77,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6083.98
+        },
+        {
+          "atS": 46.79,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 116.97,
+          "sockets": 77,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6084.43
+        },
+        {
+          "atS": 51.84,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 116.97,
+          "sockets": 77,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6084.34
+        },
+        {
+          "atS": 56.876,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 116.97,
+          "sockets": 77,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6084.2
+        },
+        {
+          "atS": 61.914,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 116.97,
+          "sockets": 77,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6084.09
+        },
+        {
+          "atS": 66.965,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 117.05,
+          "sockets": 78,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6084.53
+        },
+        {
+          "atS": 71.999,
+          "pid": 250448,
+          "cpuPct": 1.99,
+          "rssMb": 117.05,
+          "sockets": 81,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6084.54
+        },
+        {
+          "atS": 77.033,
+          "pid": 250448,
+          "cpuPct": 2.38,
+          "rssMb": 117.06,
+          "sockets": 84,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6083.42
+        },
+        {
+          "atS": 82.071,
+          "pid": 250448,
+          "cpuPct": 1.99,
+          "rssMb": 117.06,
+          "sockets": 85,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6082.54
+        },
+        {
+          "atS": 87.103,
+          "pid": 250448,
+          "cpuPct": 1.99,
+          "rssMb": 117.06,
+          "sockets": 85,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6081.87
+        },
+        {
+          "atS": 92.139,
+          "pid": 250448,
+          "cpuPct": 1.79,
+          "rssMb": 117.06,
+          "sockets": 85,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6080.96
+        },
+        {
+          "atS": 97.185,
+          "pid": 250448,
+          "cpuPct": 1.78,
+          "rssMb": 117.06,
+          "sockets": 85,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6088.23
+        }
+      ],
+      "notSampledBecause": null
+    },
+    {
+      "result": {
+        "phones": 100,
+        "latePhones": 10,
+        "track": {
+          "seconds": 30,
+          "partialsPerFrame": 16,
+          "choir": false,
+          "tts": null
+        },
+        "chunkCount": 30,
+        "arrivalLeadMs": {
+          "count": 2935,
+          "min": 943.340087890625,
+          "median": 966.561768,
+          "p1": 956.432051,
+          "p95": 972.753979,
+          "p99": 975.166177,
+          "max": 978.86083984375
+        },
+        "arrivalsWithoutClock": 0,
+        "missingChunks": 0,
+        "connects": 100,
+        "dropsDuringTrack": 0,
+        "dropsBeforeTrack": 0,
+        "roundTripMs": {
+          "count": 3029,
+          "min": 16.85655000002589,
+          "median": 22.00587,
+          "p1": 17.237566,
+          "p95": 27.251288,
+          "p99": 30.344103,
+          "max": 253.30404899996938
+        },
+        "roundTripsAtStart": {
+          "count": 90,
+          "min": 19,
+          "median": 21,
+          "p1": 19.89,
+          "p95": 22,
+          "p99": 22,
+          "max": 22
+        },
+        "offsetFromMedianMs": {
+          "count": 3060,
+          "min": 0,
+          "median": 0.155762,
+          "p1": 0.001221,
+          "p95": 0.900879,
+          "p99": 1.247559,
+          "max": 1.793212890625
+        },
+        "lateOffsetFromMedianMs": {
+          "count": 275,
+          "min": 0.001708984375,
+          "median": 0.172363,
+          "p1": 0.00415,
+          "p95": 0.651807,
+          "p99": 2.190571,
+          "max": 3.143310546875
+        },
+        "phraseLeadMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p1": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "phrasesWithoutClock": 0,
+        "missingPhrases": 0,
+        "wrongPhrases": 0,
+        "generatorDelayMs": {
+          "p99": 1.428,
+          "max": 2.476
+        },
+        "serverCpuPct": {
+          "count": 19,
+          "min": 0.99,
+          "median": 1.58,
+          "p1": 0.99,
+          "p95": 2.831,
+          "p99": 3.2702,
+          "max": 3.38
+        },
+        "serverRssMb": {
+          "count": 20,
+          "min": 114.96,
+          "median": 114.96,
+          "p1": 114.96,
+          "p95": 117.25,
+          "p99": 117.25,
+          "max": 117.25
+        },
+        "serverSockets": {
+          "count": 20,
+          "min": 53,
+          "median": 100,
+          "p1": 61.74,
+          "p95": 110,
+          "p99": 110,
+          "max": 110
+        },
+        "serverRestarts": 0,
+        "boxLoad": {
+          "count": 20,
+          "min": 0.01,
+          "median": 0.185,
+          "p1": 0.0214,
+          "p95": 0.3515,
+          "p99": 0.3743,
+          "max": 0.38
+        },
+        "boxAvailableMb": {
+          "count": 20,
+          "min": 6058.96,
+          "median": 6083.515,
+          "p1": 6061.753,
+          "p95": 6089.4575,
+          "p99": 6089.5715,
+          "max": 6089.6
+        }
+      },
+      "verdict": {
+        "outcome": "pass",
+        "checks": [
+          {
+            "threshold": {
+              "figure": "arrivalLeadMs",
+              "statistic": "p1",
+              "bound": "atLeast",
+              "limit": 500,
+              "consequence": "fail"
+            },
+            "value": 956.432051,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "missingChunks",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "dropsDuringTrack",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "offsetFromMedianMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 10,
+              "consequence": "fail"
+            },
+            "value": 1.247559,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "generatorDelayMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 20,
+              "consequence": "invalid",
+              "reason": "the load generator fell behind, so this run says nothing about the server."
+            },
+            "value": 1.428,
+            "passed": true
+          }
+        ],
+        "invalidBecause": []
+      },
+      "serverSamples": [
+        {
+          "atS": 2.687,
+          "pid": 250448,
+          "cpuPct": null,
+          "rssMb": 114.96,
+          "sockets": 53,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6058.96
+        },
+        {
+          "atS": 7.725,
+          "pid": 250448,
+          "cpuPct": 3.38,
+          "rssMb": 114.96,
+          "sockets": 99,
+          "boxLoad": 0.09,
+          "boxAvailableMb": 6073.66
+        },
+        {
+          "atS": 12.769,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.08,
+          "boxAvailableMb": 6078.16
+        },
+        {
+          "atS": 17.823,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.07,
+          "boxAvailableMb": 6083.62
+        },
+        {
+          "atS": 22.857,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.07,
+          "boxAvailableMb": 6083.38
+        },
+        {
+          "atS": 27.913,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.38,
+          "boxAvailableMb": 6083.13
+        },
+        {
+          "atS": 32.955,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.35,
+          "boxAvailableMb": 6084.11
+        },
+        {
+          "atS": 38.016,
+          "pid": 250448,
+          "cpuPct": 1.38,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.32,
+          "boxAvailableMb": 6083.89
+        },
+        {
+          "atS": 43.052,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.29,
+          "boxAvailableMb": 6083.4
+        },
+        {
+          "atS": 48.108,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.27,
+          "boxAvailableMb": 6083.41
+        },
+        {
+          "atS": 53.147,
+          "pid": 250448,
+          "cpuPct": 1.59,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.25,
+          "boxAvailableMb": 6083.15
+        },
+        {
+          "atS": 58.193,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.23,
+          "boxAvailableMb": 6081.43
+        },
+        {
+          "atS": 63.248,
+          "pid": 250448,
+          "cpuPct": 1.58,
+          "rssMb": 114.96,
+          "sockets": 100,
+          "boxLoad": 0.21,
+          "boxAvailableMb": 6080.96
+        },
+        {
+          "atS": 68.3,
+          "pid": 250448,
+          "cpuPct": 1.79,
+          "rssMb": 114.96,
+          "sockets": 102,
+          "boxLoad": 0.19,
+          "boxAvailableMb": 6087.91
+        },
+        {
+          "atS": 73.339,
+          "pid": 250448,
+          "cpuPct": 2.18,
+          "rssMb": 114.97,
+          "sockets": 106,
+          "boxLoad": 0.18,
+          "boxAvailableMb": 6087.26
+        },
+        {
+          "atS": 78.399,
+          "pid": 250448,
+          "cpuPct": 2.17,
+          "rssMb": 114.97,
+          "sockets": 109,
+          "boxLoad": 0.16,
+          "boxAvailableMb": 6086.45
+        },
+        {
+          "atS": 83.452,
+          "pid": 250448,
+          "cpuPct": 2.77,
+          "rssMb": 114.97,
+          "sockets": 110,
+          "boxLoad": 0.15,
+          "boxAvailableMb": 6089.6
+        },
+        {
+          "atS": 88.513,
+          "pid": 250448,
+          "cpuPct": 1.78,
+          "rssMb": 115.07,
+          "sockets": 110,
+          "boxLoad": 0.14,
+          "boxAvailableMb": 6089.45
+        },
+        {
+          "atS": 93.559,
+          "pid": 250448,
+          "cpuPct": 1.98,
+          "rssMb": 117.25,
+          "sockets": 110,
+          "boxLoad": 0.12,
+          "boxAvailableMb": 6087.38
+        },
+        {
+          "atS": 98.617,
+          "pid": 250448,
+          "cpuPct": 1.98,
+          "rssMb": 117.25,
+          "sockets": 110,
+          "boxLoad": 0.2,
+          "boxAvailableMb": 6085.2
+        }
+      ],
+      "notSampledBecause": null
+    },
+    {
+      "result": {
+        "phones": 125,
+        "latePhones": 13,
+        "track": {
+          "seconds": 30,
+          "partialsPerFrame": 16,
+          "choir": false,
+          "tts": null
+        },
+        "chunkCount": 30,
+        "arrivalLeadMs": {
+          "count": 3665,
+          "min": 907.115966796875,
+          "median": 961.194824,
+          "p1": 941.852617,
+          "p95": 969.004395,
+          "p99": 975.047002,
+          "max": 978.8134765625
+        },
+        "arrivalsWithoutClock": 0,
+        "missingChunks": 0,
+        "connects": 125,
+        "dropsDuringTrack": 0,
+        "dropsBeforeTrack": 0,
+        "roundTripMs": {
+          "count": 3779,
+          "min": 16.891324000025634,
+          "median": 21.93265,
+          "p1": 17.185391,
+          "p95": 27.360562,
+          "p99": 30.120293,
+          "max": 324.26502799999435
+        },
+        "roundTripsAtStart": {
+          "count": 112,
+          "min": 20,
+          "median": 21,
+          "p1": 20,
+          "p95": 22,
+          "p99": 22,
+          "max": 22
+        },
+        "offsetFromMedianMs": {
+          "count": 3808,
+          "min": 0,
+          "median": 0.168213,
+          "p1": 0.002441,
+          "p95": 1.033875,
+          "p99": 1.393279,
+          "max": 3.0244140625
+        },
+        "lateOffsetFromMedianMs": {
+          "count": 356,
+          "min": 0,
+          "median": 0.267212,
+          "p1": 0.025659,
+          "p95": 1.488464,
+          "p99": 1.720361,
+          "max": 1.87451171875
+        },
+        "phraseLeadMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p1": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "phrasesWithoutClock": 0,
+        "missingPhrases": 0,
+        "wrongPhrases": 0,
+        "generatorDelayMs": {
+          "p99": 1.846,
+          "max": 7.891
+        },
+        "serverCpuPct": {
+          "count": 19,
+          "min": 0.99,
+          "median": 1.39,
+          "p1": 0.99,
+          "p95": 3.31,
+          "p99": 4.318,
+          "max": 4.57
+        },
+        "serverRssMb": {
+          "count": 20,
+          "min": 117.27,
+          "median": 118.99,
+          "p1": 117.5968,
+          "p95": 119.8,
+          "p99": 119.8,
+          "max": 119.8
+        },
+        "serverSockets": {
+          "count": 20,
+          "min": 50,
+          "median": 122,
+          "p1": 63.68,
+          "p95": 135,
+          "p99": 135,
+          "max": 135
+        },
+        "serverRestarts": 0,
+        "boxLoad": {
+          "count": 20,
+          "min": 0.04,
+          "median": 0.085,
+          "p1": 0.04,
+          "p95": 0.181,
+          "p99": 0.1962,
+          "max": 0.2
+        },
+        "boxAvailableMb": {
+          "count": 20,
+          "min": 6062.16,
+          "median": 6074.005,
+          "p1": 6063.9251,
+          "p95": 6078.9235,
+          "p99": 6078.9767,
+          "max": 6078.99
+        }
+      },
+      "verdict": {
+        "outcome": "pass",
+        "checks": [
+          {
+            "threshold": {
+              "figure": "arrivalLeadMs",
+              "statistic": "p1",
+              "bound": "atLeast",
+              "limit": 500,
+              "consequence": "fail"
+            },
+            "value": 941.852617,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "missingChunks",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "dropsDuringTrack",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "offsetFromMedianMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 10,
+              "consequence": "fail"
+            },
+            "value": 1.393279,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "generatorDelayMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 20,
+              "consequence": "invalid",
+              "reason": "the load generator fell behind, so this run says nothing about the server."
+            },
+            "value": 1.846,
+            "passed": true
+          }
+        ],
+        "invalidBecause": []
+      },
+      "serverSamples": [
+        {
+          "atS": 1.914,
+          "pid": 250448,
+          "cpuPct": null,
+          "rssMb": 117.27,
+          "sockets": 50,
+          "boxLoad": 0.2,
+          "boxAvailableMb": 6062.16
+        },
+        {
+          "atS": 6.953,
+          "pid": 250448,
+          "cpuPct": 4.57,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.18,
+          "boxAvailableMb": 6071.45
+        },
+        {
+          "atS": 11.993,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.16,
+          "boxAvailableMb": 6073.68
+        },
+        {
+          "atS": 17.03,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.15,
+          "boxAvailableMb": 6073.8
+        },
+        {
+          "atS": 22.065,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.14,
+          "boxAvailableMb": 6073.41
+        },
+        {
+          "atS": 27.101,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.13,
+          "boxAvailableMb": 6073.17
+        },
+        {
+          "atS": 32.15,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.12,
+          "boxAvailableMb": 6073.86
+        },
+        {
+          "atS": 37.19,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.11,
+          "boxAvailableMb": 6073.93
+        },
+        {
+          "atS": 42.223,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.1,
+          "boxAvailableMb": 6073.94
+        },
+        {
+          "atS": 47.287,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.09,
+          "boxAvailableMb": 6073.94
+        },
+        {
+          "atS": 52.339,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.08,
+          "boxAvailableMb": 6076.27
+        },
+        {
+          "atS": 57.373,
+          "pid": 250448,
+          "cpuPct": 0.99,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.08,
+          "boxAvailableMb": 6076.05
+        },
+        {
+          "atS": 62.436,
+          "pid": 250448,
+          "cpuPct": 1.78,
+          "rssMb": 118.99,
+          "sockets": 122,
+          "boxLoad": 0.07,
+          "boxAvailableMb": 6076.06
+        },
+        {
+          "atS": 67.473,
+          "pid": 250448,
+          "cpuPct": 1.99,
+          "rssMb": 118.99,
+          "sockets": 124,
+          "boxLoad": 0.06,
+          "boxAvailableMb": 6076.81
+        },
+        {
+          "atS": 72.522,
+          "pid": 250448,
+          "cpuPct": 2.58,
+          "rssMb": 118.99,
+          "sockets": 129,
+          "boxLoad": 0.06,
+          "boxAvailableMb": 6076
+        },
+        {
+          "atS": 77.559,
+          "pid": 250448,
+          "cpuPct": 2.58,
+          "rssMb": 118.99,
+          "sockets": 133,
+          "boxLoad": 0.05,
+          "boxAvailableMb": 6078.99
+        },
+        {
+          "atS": 82.598,
+          "pid": 250448,
+          "cpuPct": 2.38,
+          "rssMb": 119.65,
+          "sockets": 135,
+          "boxLoad": 0.05,
+          "boxAvailableMb": 6076.73
+        },
+        {
+          "atS": 87.633,
+          "pid": 250448,
+          "cpuPct": 2.38,
+          "rssMb": 119.8,
+          "sockets": 135,
+          "boxLoad": 0.05,
+          "boxAvailableMb": 6074.07
+        },
+        {
+          "atS": 92.683,
+          "pid": 250448,
+          "cpuPct": 3.17,
+          "rssMb": 119.8,
+          "sockets": 135,
+          "boxLoad": 0.04,
+          "boxAvailableMb": 6078.92
+        },
+        {
+          "atS": 97.723,
+          "pid": 250448,
+          "cpuPct": 1.79,
+          "rssMb": 119.8,
+          "sockets": 135,
+          "boxLoad": 0.04,
+          "boxAvailableMb": 6077.55
+        }
+      ],
+      "notSampledBecause": null
+    },
+    {
+      "result": {
+        "phones": 150,
+        "latePhones": 15,
+        "track": {
+          "seconds": 30,
+          "partialsPerFrame": 16,
+          "choir": false,
+          "tts": null
+        },
+        "chunkCount": 30,
+        "arrivalLeadMs": {
+          "count": 4395,
+          "min": 823.2353515625,
+          "median": 958.522949,
+          "p1": 927.500015,
+          "p95": 968.007715,
+          "p99": 974.107954,
+          "max": 978.796875
+        },
+        "arrivalsWithoutClock": 0,
+        "missingChunks": 0,
+        "connects": 150,
+        "dropsDuringTrack": 0,
+        "dropsBeforeTrack": 0,
+        "roundTripMs": {
+          "count": 4547,
+          "min": 16.767078000004403,
+          "median": 22.139778,
+          "p1": 17.176869,
+          "p95": 29.133009,
+          "p99": 248.79471,
+          "max": 539.7904880000278
+        },
+        "roundTripsAtStart": {
+          "count": 135,
+          "min": 20,
+          "median": 21,
+          "p1": 20,
+          "p95": 22,
+          "p99": 22,
+          "max": 22
+        },
+        "offsetFromMedianMs": {
+          "count": 4590,
+          "min": 0,
+          "median": 0.20166,
+          "p1": 0.000706,
+          "p95": 1.18739,
+          "p99": 1.581921,
+          "max": 1.91259765625
+        },
+        "lateOffsetFromMedianMs": {
+          "count": 405,
+          "min": 0.001708984375,
+          "median": 0.347656,
+          "p1": 0.00293,
+          "p95": 1.578125,
+          "p99": 1.789785,
+          "max": 2.200927734375
+        },
+        "phraseLeadMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p1": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "phrasesWithoutClock": 0,
+        "missingPhrases": 0,
+        "wrongPhrases": 0,
+        "generatorDelayMs": {
+          "p99": 1.559,
+          "max": 4.328
+        },
+        "serverCpuPct": {
+          "count": 19,
+          "min": 1.19,
+          "median": 1.59,
+          "p1": 1.2242,
+          "p95": 3.909,
+          "p99": 4.9098,
+          "max": 5.16
+        },
+        "serverRssMb": {
+          "count": 20,
+          "min": 119.8,
+          "median": 119.82,
+          "p1": 119.8038,
+          "p95": 120.73,
+          "p99": 120.73,
+          "max": 120.73
+        },
+        "serverSockets": {
+          "count": 20,
+          "min": 53,
+          "median": 145,
+          "p1": 70.48,
+          "p95": 160,
+          "p99": 160,
+          "max": 160
+        },
+        "serverRestarts": 0,
+        "boxLoad": {
+          "count": 20,
+          "min": 0,
+          "median": 0.015,
+          "p1": 0.0019,
+          "p95": 0.03,
+          "p99": 0.03,
+          "max": 0.03
+        },
+        "boxAvailableMb": {
+          "count": 20,
+          "min": 6062.56,
+          "median": 6075.78,
+          "p1": 6063.6506,
+          "p95": 6076.4405,
+          "p99": 6076.4481,
+          "max": 6076.45
+        }
+      },
+      "verdict": {
+        "outcome": "pass",
+        "checks": [
+          {
+            "threshold": {
+              "figure": "arrivalLeadMs",
+              "statistic": "p1",
+              "bound": "atLeast",
+              "limit": 500,
+              "consequence": "fail"
+            },
+            "value": 927.500015,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "missingChunks",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "dropsDuringTrack",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "offsetFromMedianMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 10,
+              "consequence": "fail"
+            },
+            "value": 1.581921,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "generatorDelayMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 20,
+              "consequence": "invalid",
+              "reason": "the load generator fell behind, so this run says nothing about the server."
+            },
+            "value": 1.559,
+            "passed": true
+          }
+        ],
+        "invalidBecause": []
+      },
+      "serverSamples": [
+        {
+          "atS": 2.385,
+          "pid": 250448,
+          "cpuPct": null,
+          "rssMb": 119.8,
+          "sockets": 53,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6062.56
+        },
+        {
+          "atS": 7.422,
+          "pid": 250448,
+          "cpuPct": 5.16,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6072.25
+        },
+        {
+          "atS": 12.482,
+          "pid": 250448,
+          "cpuPct": 1.38,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6075.88
+        },
+        {
+          "atS": 17.527,
+          "pid": 250448,
+          "cpuPct": 1.59,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.03,
+          "boxAvailableMb": 6076.34
+        },
+        {
+          "atS": 22.57,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6076.45
+        },
+        {
+          "atS": 27.633,
+          "pid": 250448,
+          "cpuPct": 1.38,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6076.44
+        },
+        {
+          "atS": 32.674,
+          "pid": 250448,
+          "cpuPct": 1.59,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6076.22
+        },
+        {
+          "atS": 37.712,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6076.24
+        },
+        {
+          "atS": 42.758,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6076.25
+        },
+        {
+          "atS": 47.794,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.02,
+          "boxAvailableMb": 6076.27
+        },
+        {
+          "atS": 52.834,
+          "pid": 250448,
+          "cpuPct": 1.59,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6075.78
+        },
+        {
+          "atS": 57.868,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6075.78
+        },
+        {
+          "atS": 62.934,
+          "pid": 250448,
+          "cpuPct": 1.38,
+          "rssMb": 119.82,
+          "sockets": 145,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6075.55
+        },
+        {
+          "atS": 67.972,
+          "pid": 250448,
+          "cpuPct": 1.79,
+          "rssMb": 119.82,
+          "sockets": 148,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6076.05
+        },
+        {
+          "atS": 73.038,
+          "pid": 250448,
+          "cpuPct": 3.16,
+          "rssMb": 119.82,
+          "sockets": 153,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6073.29
+        },
+        {
+          "atS": 78.085,
+          "pid": 250448,
+          "cpuPct": 3.77,
+          "rssMb": 120.73,
+          "sockets": 158,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6070.85
+        },
+        {
+          "atS": 83.128,
+          "pid": 250448,
+          "cpuPct": 3.17,
+          "rssMb": 120.73,
+          "sockets": 160,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6068.89
+        },
+        {
+          "atS": 88.167,
+          "pid": 250448,
+          "cpuPct": 2.98,
+          "rssMb": 120.73,
+          "sockets": 160,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6069.48
+        },
+        {
+          "atS": 93.207,
+          "pid": 250448,
+          "cpuPct": 2.38,
+          "rssMb": 120.73,
+          "sockets": 160,
+          "boxLoad": 0.01,
+          "boxAvailableMb": 6068.6
+        },
+        {
+          "atS": 98.264,
+          "pid": 250448,
+          "cpuPct": 2.57,
+          "rssMb": 120.73,
+          "sockets": 160,
+          "boxLoad": 0,
+          "boxAvailableMb": 6068.3
+        }
+      ],
+      "notSampledBecause": null
+    },
+    {
+      "result": {
+        "phones": 175,
+        "latePhones": 18,
+        "track": {
+          "seconds": 30,
+          "partialsPerFrame": 16,
+          "choir": false,
+          "tts": null
+        },
+        "chunkCount": 30,
+        "arrivalLeadMs": {
+          "count": 5123,
+          "min": -2864.663818359375,
+          "median": 949.776367,
+          "p1": -1117.353706,
+          "p95": 959.993188,
+          "p99": 965.928013,
+          "max": 973.37158203125
+        },
+        "arrivalsWithoutClock": 0,
+        "missingChunks": 0,
+        "connects": 175,
+        "dropsDuringTrack": 0,
+        "dropsBeforeTrack": 0,
+        "roundTripMs": {
+          "count": 5260,
+          "min": 16.70626300002914,
+          "median": 22.78661,
+          "p1": 17.29331,
+          "p95": 35.644708,
+          "p99": 1564.8678,
+          "max": 3065.4690470000496
+        },
+        "roundTripsAtStart": {
+          "count": 157,
+          "min": 19,
+          "median": 21,
+          "p1": 19,
+          "p95": 21,
+          "p99": 22,
+          "max": 22
+        },
+        "offsetFromMedianMs": {
+          "count": 5338,
+          "min": 0,
+          "median": 0.300781,
+          "p1": 0.001709,
+          "p95": 1.21582,
+          "p99": 1.46875,
+          "max": 1.93896484375
+        },
+        "lateOffsetFromMedianMs": {
+          "count": 484,
+          "min": 0.0029296875,
+          "median": 0.2854,
+          "p1": 0.012166,
+          "p95": 1.548279,
+          "p99": 2.065918,
+          "max": 2.07275390625
+        },
+        "phraseLeadMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p1": null,
+          "p95": null,
+          "p99": null,
+          "max": null
+        },
+        "phrasesWithoutClock": 0,
+        "missingPhrases": 0,
+        "wrongPhrases": 0,
+        "generatorDelayMs": {
+          "p99": 1.616,
+          "max": 4.959
+        },
+        "serverCpuPct": {
+          "count": 19,
+          "min": 1.19,
+          "median": 1.79,
+          "p1": 1.19,
+          "p95": 6.759,
+          "p99": 8.3358,
+          "max": 8.73
+        },
+        "serverRssMb": {
+          "count": 20,
+          "min": 110.98,
+          "median": 120.74,
+          "p1": 111.3695,
+          "p95": 120.74,
+          "p99": 120.74,
+          "max": 120.74
+        },
+        "serverSockets": {
+          "count": 20,
+          "min": 38,
+          "median": 167,
+          "p1": 61.94,
+          "p95": 185,
+          "p99": 185,
+          "max": 185
+        },
+        "serverRestarts": 0,
+        "boxLoad": {
+          "count": 20,
+          "min": 0,
+          "median": 0,
+          "p1": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "boxAvailableMb": {
+          "count": 20,
+          "min": 6055.61,
+          "median": 6076.735,
+          "p1": 6058.5037,
+          "p95": 6085.9905,
+          "p99": 6088.8861,
+          "max": 6089.61
+        }
+      },
+      "verdict": {
+        "outcome": "fail",
+        "checks": [
+          {
+            "threshold": {
+              "figure": "arrivalLeadMs",
+              "statistic": "p1",
+              "bound": "atLeast",
+              "limit": 500,
+              "consequence": "fail"
+            },
+            "value": -1117.353706,
+            "passed": false
+          },
+          {
+            "threshold": {
+              "figure": "missingChunks",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "dropsDuringTrack",
+              "bound": "atMost",
+              "limit": 0,
+              "consequence": "fail"
+            },
+            "value": 0,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "offsetFromMedianMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 10,
+              "consequence": "fail"
+            },
+            "value": 1.46875,
+            "passed": true
+          },
+          {
+            "threshold": {
+              "figure": "generatorDelayMs",
+              "statistic": "p99",
+              "bound": "atMost",
+              "limit": 20,
+              "consequence": "invalid",
+              "reason": "the load generator fell behind, so this run says nothing about the server."
+            },
+            "value": 1.616,
+            "passed": true
+          }
+        ],
+        "invalidBecause": []
+      },
+      "serverSamples": [
+        {
+          "atS": 2.607,
+          "pid": 250448,
+          "cpuPct": null,
+          "rssMb": 120.73,
+          "sockets": 38,
+          "boxLoad": 0,
+          "boxAvailableMb": 6055.61
+        },
+        {
+          "atS": 7.654,
+          "pid": 250448,
+          "cpuPct": 6.54,
+          "rssMb": 120.74,
+          "sockets": 164,
+          "boxLoad": 0,
+          "boxAvailableMb": 6070.84
+        },
+        {
+          "atS": 12.703,
+          "pid": 250448,
+          "cpuPct": 1.98,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6072.13
+        },
+        {
+          "atS": 17.752,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6071.32
+        },
+        {
+          "atS": 22.794,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6071.07
+        },
+        {
+          "atS": 27.834,
+          "pid": 250448,
+          "cpuPct": 1.79,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6070.84
+        },
+        {
+          "atS": 32.876,
+          "pid": 250448,
+          "cpuPct": 1.78,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6070.85
+        },
+        {
+          "atS": 37.92,
+          "pid": 250448,
+          "cpuPct": 1.19,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6077.59
+        },
+        {
+          "atS": 42.958,
+          "pid": 250448,
+          "cpuPct": 1.59,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6077.12
+        },
+        {
+          "atS": 47.997,
+          "pid": 250448,
+          "cpuPct": 1.39,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6077.12
+        },
+        {
+          "atS": 53.042,
+          "pid": 250448,
+          "cpuPct": 1.78,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6076.86
+        },
+        {
+          "atS": 58.086,
+          "pid": 250448,
+          "cpuPct": 1.59,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6076.61
+        },
+        {
+          "atS": 63.13,
+          "pid": 250448,
+          "cpuPct": 1.78,
+          "rssMb": 120.74,
+          "sockets": 167,
+          "boxLoad": 0,
+          "boxAvailableMb": 6076.61
+        },
+        {
+          "atS": 68.195,
+          "pid": 250448,
+          "cpuPct": 3.55,
+          "rssMb": 120.74,
+          "sockets": 171,
+          "boxLoad": 0,
+          "boxAvailableMb": 6079.16
+        },
+        {
+          "atS": 73.238,
+          "pid": 250448,
+          "cpuPct": 3.37,
+          "rssMb": 120.74,
+          "sockets": 177,
+          "boxLoad": 0,
+          "boxAvailableMb": 6076.48
+        },
+        {
+          "atS": 78.366,
+          "pid": 250448,
+          "cpuPct": 8.73,
+          "rssMb": 110.98,
+          "sockets": 183,
+          "boxLoad": 0,
+          "boxAvailableMb": 6084.44
+        },
+        {
+          "atS": 83.324,
+          "pid": 250448,
+          "cpuPct": 3.77,
+          "rssMb": 113.03,
+          "sockets": 185,
+          "boxLoad": 0,
+          "boxAvailableMb": 6079
+        },
+        {
+          "atS": 88.387,
+          "pid": 250448,
+          "cpuPct": 3.16,
+          "rssMb": 115.59,
+          "sockets": 185,
+          "boxLoad": 0,
+          "boxAvailableMb": 6085.8
+        },
+        {
+          "atS": 93.792,
+          "pid": 250448,
+          "cpuPct": 3.57,
+          "rssMb": 115.86,
+          "sockets": 185,
+          "boxLoad": 0,
+          "boxAvailableMb": 6083.32
+        },
+        {
+          "atS": 98.468,
+          "pid": 250448,
+          "cpuPct": 2.98,
+          "rssMb": 115.87,
+          "sockets": 185,
+          "boxLoad": 0,
+          "boxAvailableMb": 6089.61
+        }
+      ],
+      "notSampledBecause": null
+    }
+  ],
+  "end": {
+    "kind": "break",
+    "phones": 175,
+    "failed": [
+      {
+        "threshold": {
+          "figure": "arrivalLeadMs",
+          "statistic": "p1",
+          "bound": "atLeast",
+          "limit": 500,
+          "consequence": "fail"
+        },
+        "value": -1117.353706,
+        "passed": false
+      }
+    ]
+  }
+}

@@ -2,6 +2,41 @@
 
 What load tests against the capacity instance found. How to run them is in [`loadtest/README.md`](../loadtest/README.md); each run's figures are in its results file in [`loadtest/results/`](../loadtest/results/).
 
+## Ramp, 2026-11-23: broke at 175 phones on a cable to the router
+
+The ramp of 2026-11-10 repeated with the laptop on a cable to the home router instead of WiFi, to see whether the WiFi is what broke. The server commit changed too, see below.
+
+| What | Value |
+| --- | --- |
+| Results file | [`2026-11-23T1734Z-sadiss.net-capacity-server-ramp.json`](../loadtest/results/2026-11-23T1734Z-sadiss.net-capacity-server-ramp.json) |
+| Server commit | `02734322`, with `PERFORMANCE_LOG_DIR` unset. Newer than the `d14b3296` of the earlier ramps: it adds the performance log and fixes for messages and sends that could crash the server |
+| Target | the capacity instance through nginx and TLS, with no connection on the live instance's ports before the run |
+| Generator | the same laptop, Node v22.23.5, on a 1 Gbit/s cable to the home router and through the same home internet line |
+| Ramp | as on 2026-11-10: 25 phones, 25 more each step; nonChoir track of 30 chunks with 16 partials per frame; about one phone in ten joins during the track (3 of 25 up to 18 of 175) |
+| Last step that passed | 150 phones |
+| Broke at | 175 phones |
+| What broke first | arrival before sound p1: -1117 ms, against at least 500 ms. No chunk missing, no drop, clock offset p99 1.47 ms, generator event loop p99 1.62 ms |
+
+Per step:
+
+| Phones | Outcome | Arrival p1 | Arrival min | Round trip median | Round trip p99 | Round trip max | Server CPU max | Server memory max |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 25 | PASS | 933 ms | 930 ms | 21.9 ms | 27 ms | 70 ms | 2.0% | 116 MB |
+| 50 | PASS | 967 ms | 963 ms | 22.0 ms | 29 ms | 52 ms | 3.4% | 117 MB |
+| 75 | PASS | 963 ms | 949 ms | 21.9 ms | 30 ms | 95 ms | 3.8% | 117 MB |
+| 100 | PASS | 956 ms | 943 ms | 22.0 ms | 30 ms | 253 ms | 3.4% | 117 MB |
+| 125 | PASS | 942 ms | 907 ms | 21.9 ms | 30 ms | 324 ms | 4.6% | 120 MB |
+| 150 | PASS | 928 ms | 823 ms | 22.1 ms | 249 ms | 540 ms | 5.2% | 121 MB |
+| 175 | FAIL | -1117 ms | -2865 ms | 22.8 ms | 1565 ms | 3065 ms | 8.7% | 121 MB |
+
+The box's load stayed at or below 0.38 in every step.
+
+### What the three ramps say together
+
+Measured: on the cable the round trip p99 stayed at 27 to 30 ms up to 125 phones, where both WiFi ramps had a step with a p99 of 250 ms or more at 125 phones or fewer; single slow round trips of up to 324 ms still came at 100 and 125 phones. At 150 phones the p99 rose to 249 ms. At 175 it broke the way both WiFi ramps did: the median round trip stayed at 23 ms, as in the steps before, while the p99 rose to 1.6 s and at least 1% of chunk arrivals came after their sound, up to 2.9 s late. The server's process peaked at 8.7% of one core, against under 4% in the WiFi breaks.
+
+Inferred, not shown: the cable kept the slow round trips out of the p99 below 150 phones but did not move the break, so the WiFi was not what broke. The newer server commit is unlikely to have moved it either: its log was off, the rest are crash fixes, and the server's process stayed under 9% of one core; this run does not rule it out. Between generator and server are still the home internet line, the internet in between and nginx on the box. A generator near the box (#198) takes the home line and the internet out of the path and leaves nginx and the server: if it carries well past 175 phones, the break is on the home line or the internet; if it breaks near 175, it is in nginx or the server.
+
 ## Logging on and off, 2026-11-10: no difference beyond run-to-run noise
 
 The performance log (PR #199) against the capacity instance, at the last step today's ramp passed: 100 phones, 10 of them joining during the track, a nonChoir track of 30 chunks with 16 partials per frame. Two runs with `PERFORMANCE_LOG_DIR` unset, then two with it set, the instance restarted in between. Server commit `0c565a68`; generator and network as in the ramps below.
@@ -21,13 +56,14 @@ Not measured here: the server's own event-loop lag (the load test samples CPU an
 
 ## Ramp, 2026-11-10: broke at 125 phones, the same way, from the same WiFi
 
-The ramp of 2026-11-08 repeated with the same server, generator and network, to see whether 175 phones repeats.
+The ramp of 2026-11-08 repeated with the same server, generator and network, to see whether 175 phones repeats. The load test had changed in between: about one phone in ten now joins during the track.
 
 | What | Value |
 | --- | --- |
 | Results file | [`2026-11-10T1737Z-sadiss.net-capacity-server-ramp.json`](../loadtest/results/2026-11-10T1737Z-sadiss.net-capacity-server-ramp.json) |
 | Server commit | `d14b3296`, as on 2026-11-08 |
-| Target, generator, ramp | as on 2026-11-08: the capacity instance through nginx and TLS with the live instance idle, the same laptop on home WiFi, 25 phones and 25 more each step |
+| Target, generator | as on 2026-11-08: the capacity instance through nginx and TLS with the live instance idle, the same laptop on home WiFi |
+| Ramp | 25 phones, 25 more each step; nonChoir track of 30 chunks with 16 partials per frame; about one phone in ten joins during the track (3 of 25 up to 13 of 125) |
 | Last step that passed | 100 phones |
 | Broke at | 125 phones |
 | What broke first | arrival before sound p1: -1253 ms, against at least 500 ms. No chunk missing, no drop, clock offset p99 0.98 ms, generator event loop p99 1.04 ms |
@@ -46,9 +82,9 @@ The box's load stayed at or below 0.08 in every step.
 
 ### What the two ramps say together
 
-Measured: the step that broke was 175 phones on 2026-11-08 and 125 today, with the same server and setup. Both times the median round trip stayed at 24 to 26 ms while the p99 jumped past 1.5 s, a few chunks arrived seconds late, and the server's process used under 4% of one core. At 75 phones today a smaller burst of slow round trips (p99 251 ms) passed the thresholds.
+Measured: the step that broke was 175 phones on 2026-11-08 and 125 today, with the same server and network; today about one phone in ten joined during the track, on 2026-11-08 none did. Both times the median round trip stayed at 24 to 26 ms while the p99 jumped past 1.5 s, a few chunks arrived seconds late, and the server's process used under 4% of one core. At 75 phones today a smaller burst of slow round trips (p99 251 ms) passed the thresholds.
 
-Inferred, not shown: a limit that moves by 50 phones between two runs of the same setup, with an idle server, is the path between generator and box, not the server. The server's own limit is still not measured. The laptop has no wired line to the internet, so the wired run waits for a cable to the router; a generator near the box would also take the home line out of the path.
+Inferred, not shown: with an idle server and the same shape of break both times, the path between generator and box looks like the limit, not the server. Whether the late joiners moved the break from 175 to 125 phones, these two runs cannot tell. The server's own limit is still not measured. The ramp of 2026-11-23 above repeats this ramp on a cable.
 
 ## Ramp, 2026-11-08: broke at 175 phones, with the server nearly idle
 
@@ -83,4 +119,4 @@ Measured: at 175 phones the median chunk still arrived 924 ms before its sound, 
 
 Inferred, not shown: the delay was not in the server's process, which was nearly idle, nor in the generator's event loop. What is left is the path between them: the generator's WiFi and home internet line, the internet in between, and nginx on the box. Occasional multi-second delays on a few messages, with the median unchanged, look like packets lost and sent again on that path rather than a busy server. This run cannot tell which part of the path it was.
 
-So 175 phones is where this setup broke, not where the server does. The server's own limit is above 175 phones and has not been measured. A ramp from a generator on a wired line, or on a machine near the box, would separate the two.
+So 175 phones is where this setup broke, not where the server does. The server's own limit is above 175 phones and has not been measured. The ramp of 2026-11-23 above ran from a wired line and broke at the same step, so only a generator near the box is left to separate the two.
