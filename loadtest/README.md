@@ -30,7 +30,7 @@ After the figures, a run checks each threshold in [`src/thresholds.ts`](src/thre
 - **Missing chunks** and **drops during the track:** every phone receives every chunk (a late phone from the chunk the room section above names), and no phone loses its connection from the start of the track until it is stopped. Drops before the track are printed as a count and have no threshold.
 - **Clock offset off the median p99:** 99% of the sampled offsets of the phones that joined before the track are that close to their median.
 - For a track with phrases, phrases are held to the same rules as chunks: **phrase before its time p1** at least the same limit, and no **missing phrases** or **wrong phrases**.
-- **Generator event loop p99:** the load generator kept up. When its own event loop fell behind by more than the limit, the generator could not have read or answered the server on time, so a late chunk or a slow clock answer might be its own fault. The run is then INVALID, whatever the other checks say, and should be repeated with a faster laptop or fewer phones. The checks are still printed.
+- **Generator event loop p99:** the load generator kept up. When its own event loop fell behind by more than the limit, the generator could not have read or answered the server on time, so a late chunk or a slow clock answer might be its own fault. The run is then INVALID, whatever the other checks say, and should be repeated with a faster machine or fewer phones. One generator is one Node process, so more cores do not help it; how far one carries is in [`docs/load-test-results.md`](../docs/load-test-results.md). The checks are still printed.
 
 A check whose figure has no value, such as no chunk arriving at a phone that had a clock, fails and prints `-`.
 
@@ -150,6 +150,17 @@ cd loadtest
 eval "$(ssh root@sadiss.net "sed -n 's/^ADMIN_/export SADISS_ADMIN_/p' /root/.sadiss-capacity")"
 npm run loadtest -- --api https://sadiss.net/capacity/server --ws wss://sadiss.net/capacity/ws/ --phones 100
 ```
+
+To take the network out of the path, the generator can run on the box itself, still through nginx and TLS. It needs a checkout there with the load test installed, and ssh from the box to itself for the server samples and the commit; forwarding your ssh agent gives it both, and the clone from GitHub too:
+
+```sh
+ssh -A root@sadiss.net
+git clone git@github.com:sadiss-org/sadiss.git /root/sadiss && cd /root/sadiss/loadtest && npm ci
+eval "$(sed -n 's/^ADMIN_/export SADISS_ADMIN_/p' /root/.sadiss-capacity)"
+npm run loadtest -- --api https://sadiss.net/capacity/server --ws wss://sadiss.net/capacity/ws/ --ramp
+```
+
+The generator then shares the box's CPU with the server it measures, and with the live instance, so the same rule holds: never while a performance is live.
 
 To remove it: `loadtest/capacity/remove.sh`. It asks first, then deletes the nginx routes, the PM2 app, the database and its user, the folders, the data and the secrets.
 
