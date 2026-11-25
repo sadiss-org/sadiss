@@ -7,11 +7,10 @@ import { planRoom } from './room'
 import { Sampled, SamplingTarget, serverFigures, startSampler } from './serverSampler'
 import { createTarget, PreparedPerformance } from './target'
 import { tally, trafficBetween } from './traffic'
+import { trackWindow } from './chunkSchedule'
 
 /** How long after the last chunk is due it may still be on its way. */
 const TAIL_MS = 4000
-
-const CHUNK_MS = CHUNK_SECONDS * 1000
 
 /** How often the server under test is sampled. */
 const SAMPLE_EVERY_S = 5
@@ -79,12 +78,11 @@ export const runRoom = async (
     const startedAtMs = Date.now()
     const trackMs = performance.chunkCount * CHUNK_SECONDS * 1000
     const lateJoining = joinGradually(audience, seats.filter(({ seat }) => seat.late), trackMs / 2)
-    // The phones' traffic while the track plays. The server sends one chunk each chunk's time, the first a chunk
-    // after the start and the last as the track's time ends, so a window of the track's length that starts half a
-    // chunk late holds every chunk once, as long as chunks reach the phones within half a chunk of the start's answer.
-    await sleep(CHUNK_MS / 2)
+    // The phones' traffic while the track plays.
+    const window = trackWindow(performance.chunkCount)
+    await sleep(Math.max(0, startedAtMs + window.fromMs - Date.now()))
     const playing = tally(audience.phones)
-    await sleep(trackMs)
+    await sleep(Math.max(0, startedAtMs + window.toMs - Date.now()))
     const duringTrack = trafficBetween(playing, tally(audience.phones))
     await sleep(Math.max(0, startedAtMs + trackMs + TAIL_MS - Date.now()))
     await lateJoining

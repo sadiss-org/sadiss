@@ -1,5 +1,6 @@
 import { monitorEventLoopDelay, performance } from 'node:perf_hooks'
 import { CHUNK_SECONDS } from '@server/types/ChunkEnvelope'
+import { firstChunkSentAfter } from './chunkSchedule'
 import { distancesFromMedian, summarize, Summary } from './stats'
 import { phrases, phraseText, TrackShape } from './track'
 import { Audience } from './audience'
@@ -47,17 +48,15 @@ export interface RunResult extends ServerFigures, TrafficFigures {
 
 const SAMPLE_EVERY_MS = 1000
 const DELAY_RESOLUTION_MS = 10
-const CHUNK_MS = CHUNK_SECONDS * 1000
 
 /**
- * The first chunk a phone is expected to receive. The server sends chunk k
- * one chunk's time after it sent chunk k - 1, the first a chunk after the start.
- * The next one sent after a phone went live may race its registration, so the
- * phone is expected to receive every chunk from the one after. A phone that
- * never went live is counted from when it started to connect.
+ * The first chunk a phone is expected to receive. The next one the server sends
+ * after a phone went live may race its registration, so the phone is expected
+ * to receive every chunk from the one after. A phone that never went live is
+ * counted from when it started to connect.
  */
 const firstExpectedChunk = (phone: VirtualPhone, startedAtMs: number) =>
-  Math.max(0, Math.floor(((phone.firstLiveAtMs ?? phone.joinedAtMs) - startedAtMs) / CHUNK_MS) + 1)
+  firstChunkSentAfter((phone.firstLiveAtMs ?? phone.joinedAtMs) - startedAtMs) + 1
 
 const phraseCounts = (phone: VirtualPhone, track: TrackShape, fromChunk: number) => {
   const voice = track.choir ? phone.seat.choirId : 0
