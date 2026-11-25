@@ -1,71 +1,55 @@
 import { performance } from 'node:perf_hooks'
 import { summarize, Summary } from './stats'
 
-/** The bytes a phone's WebSocket connections carried so far, every frame counted whole, its header included. */
+/**
+ * The bytes of every message frame a phone's WebSocket connections carried so
+ * far, each with its header. Control frames, such as pings, are not counted,
+ * since the WebSocket API does not show them.
+ */
 export interface ByteCount {
   received: number
   sent: number
 }
 
-/**
- * The size of a WebSocket frame that carries `payload` bytes: a 2-byte header,
- * 2 or 8 bytes more for a longer payload's length, and a 4-byte mask on every
- * frame a phone sends, since a client masks its frames and a server does not.
- */
-export const frameBytes = (payload: number, fromPhone: boolean) =>
-  payload + 2 + (payload > 0xffff ? 8 : payload > 125 ? 2 : 0) + (fromPhone ? 4 : 0)
-
-/** The bytes of a message's payload: a text in UTF-8, binary data by its length. */
-export const payloadBytes = (data: unknown) => {
-  if (typeof data === 'string') return Buffer.byteLength(data)
-  if (data instanceof Blob) return data.size
-  if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) return data.byteLength
-  return 0
-}
-
 /** Each phone's byte counts at one moment, in the order the phones joined. */
 export interface Tally {
   atMs: number
-  phones: (ByteCount & { joinedAtMs: number })[]
+  phones: (ByteCount & { firstLiveAtMs: number | null })[]
 }
 
 /** Takes a tally of the phones, on the generator's `performance.now()` clock. */
-export const tally = (phones: readonly { joinedAtMs: number; bytes: ByteCount }[], atMs = performance.now()): Tally => ({
+export const tally = (phones: readonly { firstLiveAtMs: number | null; bytes: ByteCount }[], atMs = performance.now()): Tally => ({
   atMs,
-  phones: phones.map((phone) => ({ joinedAtMs: phone.joinedAtMs, ...phone.bytes }))
+  phones: phones.map((phone) => ({ firstLiveAtMs: phone.firstLiveAtMs, ...phone.bytes }))
 })
+
+/** The shortest time a phone is counted over; a rate over less says little. */
+const SHORTEST_MS = 1000
 
 const perSecond = (bytes: number, ms: number) => Number(((bytes * 1000) / ms).toFixed(2))
 
 /**
  * How many bytes per second each phone received and sent from one tally to a
- * later one of the same audience. A phone that joined in between is counted
- * from when it joined; one that joined as the later tally was taken has no
- * time to be counted over and is left out.
+ * later one of the same audience, counted from the first tally or from when
+ * the phone's connection first went live, whichever is later. A phone that
+ * never went live, or was live for less than a second of the window, is left
+ * out, so a window shorter than a second has no values.
  */
 export const trafficBetween = (from: Tally, to: Tally): { received: Summary; sent: Summary } => {
   const rates = to.phones.flatMap((now, index) => {
+    if (now.firstLiveAtMs === null) return []
     const before = from.phones[index]
-    const ms = to.atMs - (before ? from.atMs : now.joinedAtMs)
-    if (ms <= 0) return []
+    const ms = to.atMs - Math.max(from.atMs, now.firstLiveAtMs)
+    if (ms < SHORTEST_MS) return []
     return [{ received: perSecond(now.received - (before?.received ?? 0), ms), sent: perSecond(now.sent - (before?.sent ?? 0), ms) }]
   })
   return { received: summarize(rates.map((rate) => rate.received)), sent: summarize(rates.map((rate) => rate.sent)) }
 }
 
-/** What each phone was sent and sent itself, per second, over the phones of the run. */
+/** The bytes per second each phone received and sent, over the windows `runRoom` measures them in. */
 export interface TrafficFigures {
-  /** While the track played, from half a chunk after its start over the track's length, so every chunk the server sent is counted once. */
   receivedBytesPerSDuringTrack: Summary
   sentBytesPerSDuringTrack: Summary
-  /** While the phones that joined before the track settled their clocks, as between two tracks. */
-  receivedBytesPerSBeforeTrack: Summary
-  sentBytesPerSBeforeTrack: Summary
+  receivedBytesPerSWhileSettling: Summary
+  sentBytesPerSWhileSettling: Summary
 }
-
-export const trafficFigures = (beforeTrack: ReturnType<typeof trafficBetween>, duringTrack: ReturnType<typeof trafficBetween>): TrafficFigures => ({
-  receivedBytesPerSDuringTrack: duringTrack.received,
-  sentBytesPerSDuringTrack: duringTrack.sent,
-  receivedBytesPerSBeforeTrack: beforeTrack.received,
-  sentBytesPerSBeforeTrack: beforeTrack.sent
-})

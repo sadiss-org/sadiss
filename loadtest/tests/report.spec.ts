@@ -30,8 +30,8 @@ const step = (phones: number, spoil: (result: RunResult) => void = () => undefin
     generatorDelayMs: { p99: 0.85, max: 3 },
     receivedBytesPerSDuringTrack: { count: 3, min: 3800, median: 3877.5, p1: 3800, p95: 3900, p99: 3900, max: 3900 },
     sentBytesPerSDuringTrack: empty,
-    receivedBytesPerSBeforeTrack: empty,
-    sentBytesPerSBeforeTrack: empty,
+    receivedBytesPerSWhileSettling: empty,
+    sentBytesPerSWhileSettling: empty,
     ...serverFigures([])
   }
   spoil(result)

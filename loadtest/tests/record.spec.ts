@@ -7,9 +7,6 @@ import { RunResult } from '../src/results'
 import { summarize } from '../src/stats'
 import { judge } from '../src/verdict'
 import { serverFigures } from '../src/serverSampler'
-import { trafficFigures } from '../src/traffic'
-
-const NO_TRAFFIC = { received: summarize([]), sent: summarize([]) }
 
 const empty = summarize([])
 const run: RunResult = {
@@ -33,7 +30,10 @@ const run: RunResult = {
   wrongPhrases: 0,
   generatorDelayMs: { p99: 0.8, max: 3 },
   ...serverFigures([]),
-  ...trafficFigures(NO_TRAFFIC, NO_TRAFFIC)
+  receivedBytesPerSDuringTrack: summarize([]),
+  sentBytesPerSDuringTrack: summarize([]),
+  receivedBytesPerSWhileSettling: summarize([]),
+  sentBytesPerSWhileSettling: summarize([])
 }
 
 const record = {

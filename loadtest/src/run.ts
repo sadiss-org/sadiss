@@ -6,7 +6,7 @@ import { RunResult, watch } from './results'
 import { planRoom } from './room'
 import { Sampled, SamplingTarget, serverFigures, startSampler } from './serverSampler'
 import { createTarget, PreparedPerformance } from './target'
-import { tally, trafficBetween, trafficFigures } from './traffic'
+import { tally, trafficBetween } from './traffic'
 
 /** How long after the last chunk is due it may still be on its way. */
 const TAIL_MS = 4000
@@ -71,26 +71,32 @@ export const runRoom = async (
     if (audience.phones.every((phone) => phone.connects === 0)) {
       throw new Error(`No phone could connect to ${options.wsUrl}.`)
     }
-    const beforeTrack = trafficBetween(settling, tally(audience.phones))
+    // The phones' traffic while they settle their clocks, as between two tracks.
+    const whileSettling = trafficBetween(settling, tally(audience.phones))
 
     watching = watch(audience)
     await performance.start()
+    const startedAtMs = Date.now()
     const trackMs = performance.chunkCount * CHUNK_SECONDS * 1000
     const lateJoining = joinGradually(audience, seats.filter(({ seat }) => seat.late), trackMs / 2)
-    // The server sends one chunk each chunk's time, the first a chunk after the start and the last as the track's
-    // time ends, so a window of the track's length that starts half a chunk late holds every chunk once.
+    // The phones' traffic while the track plays. The server sends one chunk each chunk's time, the first a chunk
+    // after the start and the last as the track's time ends, so a window of the track's length that starts half a
+    // chunk late holds every chunk once, as long as chunks reach the phones within half a chunk of the start's answer.
     await sleep(CHUNK_MS / 2)
     const playing = tally(audience.phones)
     await sleep(trackMs)
     const duringTrack = trafficBetween(playing, tally(audience.phones))
-    await sleep(TAIL_MS - CHUNK_MS / 2)
+    await sleep(Math.max(0, startedAtMs + trackMs + TAIL_MS - Date.now()))
     await lateJoining
     await stopTrack(performance, warn)
     const server = await stopSampling()
     const result = {
       ...watching.finish(options.track, performance.chunkCount),
       ...serverFigures(server.samples),
-      ...trafficFigures(beforeTrack, duringTrack)
+      receivedBytesPerSDuringTrack: duringTrack.received,
+      sentBytesPerSDuringTrack: duringTrack.sent,
+      receivedBytesPerSWhileSettling: whileSettling.received,
+      sentBytesPerSWhileSettling: whileSettling.sent
     }
     watching = undefined
     return { result, server }

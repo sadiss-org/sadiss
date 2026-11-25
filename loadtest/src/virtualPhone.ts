@@ -3,7 +3,8 @@ import { createClockSync } from "@/composables/clockSync";
 import { connectDevice } from "@/composables/deviceConnection";
 import { Seat } from "./room";
 import { chunkLeadMs } from "@/composables/chunkTiming";
-import { ByteCount, frameBytes, payloadBytes } from "./traffic";
+import { frameBytes, payloadBytes } from "./frames";
+import { ByteCount } from "./traffic";
 
 export interface PhoneOptions {
   wsUrl: string;
@@ -78,7 +79,7 @@ export const startVirtualPhone = ({
     }
 
     override send(data: Parameters<WebSocket["send"]>[0]) {
-      // A socket that is not open discards what it is given.
+      // Only an open socket sends; a closing or closed one drops what it is given.
       if (this.readyState === WebSocket.OPEN)
         phone.bytes.sent += frameBytes(payloadBytes(data), true);
       super.send(data);

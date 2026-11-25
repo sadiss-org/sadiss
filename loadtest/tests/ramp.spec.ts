@@ -3,9 +3,6 @@ import { ramp } from '../src/ramp'
 import { RunResult } from '../src/results'
 import { serverFigures } from '../src/serverSampler'
 import { summarize } from '../src/stats'
-import { trafficFigures } from '../src/traffic'
-
-const NO_TRAFFIC = { received: summarize([]), sent: summarize([]) }
 
 const empty = summarize([])
 
@@ -32,7 +29,10 @@ const result = (phones: number, spoil: (result: RunResult) => void = () => undef
     wrongPhrases: 0,
     generatorDelayMs: { p99: 1, max: 2 },
     ...serverFigures([]),
-    ...trafficFigures(NO_TRAFFIC, NO_TRAFFIC)
+    receivedBytesPerSDuringTrack: summarize([]),
+    sentBytesPerSDuringTrack: summarize([]),
+    receivedBytesPerSWhileSettling: summarize([]),
+    sentBytesPerSWhileSettling: summarize([])
   }
   spoil(run)
   return run

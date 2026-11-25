@@ -30,8 +30,8 @@ const result = (): RunResult => ({
   generatorDelayMs: { p99: 0.8, max: 3 },
   receivedBytesPerSDuringTrack: spread(3900, 3880, 3950),
   sentBytesPerSDuringTrack: spread(16, 15, 18),
-  receivedBytesPerSBeforeTrack: spread(36, 35, 40),
-  sentBytesPerSBeforeTrack: spread(16, 15, 18),
+  receivedBytesPerSWhileSettling: spread(36, 35, 40),
+  sentBytesPerSWhileSettling: spread(16, 15, 18),
   ...serverFigures([]),
   serverCpuPct: spread(20, 5, 60),
   serverRestarts: 0
@@ -121,7 +121,7 @@ describe('comparing runs', () => {
     expect(received(4291).cells[1]?.worse).toBe(true)
     expect(received(4289).cells[1]?.worse).toBe(false)
     const sent = (median: number) =>
-      row(compareRuns([record(), record((run) => (run.sentBytesPerSBeforeTrack.median = median))]), 'Each phone to server, settling median')
+      row(compareRuns([record(), record((run) => (run.sentBytesPerSWhileSettling.median = median))]), 'Each phone to server, settling median')
     expect(sent(28.6).cells[1]?.worse).toBe(true)
     expect(sent(28.4).cells[1]?.worse).toBe(false)
   })

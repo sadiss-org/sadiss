@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { frameBytes, payloadBytes, tally, trafficBetween } from '../src/traffic'
+import { frameBytes, payloadBytes } from '../src/frames'
+import { tally, trafficBetween } from '../src/traffic'
 import { VirtualPhone } from '../src/virtualPhone'
 
 describe('the size of a WebSocket frame', () => {
@@ -35,8 +36,8 @@ describe('the size of a message', () => {
   })
 })
 
-const phone = (joinedAtMs: number, received: number, sent: number): Pick<VirtualPhone, 'joinedAtMs' | 'bytes'> => ({
-  joinedAtMs,
+const phone = (firstLiveAtMs: number | null, received: number, sent: number): Pick<VirtualPhone, 'firstLiveAtMs' | 'bytes'> => ({
+  firstLiveAtMs,
   bytes: { received, sent }
 })
 
@@ -49,7 +50,7 @@ describe('the bytes per second of each phone between two tallies', () => {
     expect(sent).toMatchObject({ count: 2, min: 100, max: 200 })
   })
 
-  it('counts a phone that joined in between from when it joined', () => {
+  it('counts a phone that went live in between from when it went live', () => {
     const before = tally([phone(0, 0, 0)], 10_000)
     const after = tally([phone(0, 8000, 0), phone(11_000, 4000, 50)], 12_000)
     const { received, sent } = trafficBetween(before, after)
@@ -57,10 +58,22 @@ describe('the bytes per second of each phone between two tallies', () => {
     expect(sent.max).toBe(50)
   })
 
-  it('leaves out a phone that joined as the later tally was taken', () => {
+  it('counts a phone that was already there but went live in between from when it went live', () => {
+    const before = tally([phone(null, 0, 0)], 10_000)
+    const after = tally([phone(11_000, 4000, 0)], 12_000)
+    expect(trafficBetween(before, after).received.max).toBe(4000)
+  })
+
+  it('leaves out a phone that never went live, so it does not read as a phone sent nothing', () => {
     const before = tally([phone(0, 0, 0)], 10_000)
-    const after = tally([phone(0, 8000, 0), phone(12_000, 0, 0)], 12_000)
+    const after = tally([phone(0, 8000, 0), phone(null, 0, 0)], 12_000)
     expect(trafficBetween(before, after).received.count).toBe(1)
+  })
+
+  it('leaves out a phone live for less than a second of the window, and so a window shorter than a second', () => {
+    const after = tally([phone(0, 8000, 0), phone(11_500, 900, 0)], 12_000)
+    expect(trafficBetween(tally([phone(0, 0, 0)], 10_000), after).received.count).toBe(1)
+    expect(trafficBetween(tally([phone(0, 0, 0)], 11_999), tally([phone(0, 0, 0)], 12_000)).received.count).toBe(0)
   })
 
   it('has no values without phones', () => {

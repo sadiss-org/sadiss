@@ -4,9 +4,6 @@ import { summarize } from '../src/stats'
 import { PHRASE_THRESHOLDS, Threshold, THRESHOLDS } from '../src/thresholds'
 import { judge } from '../src/verdict'
 import { serverFigures } from '../src/serverSampler'
-import { trafficFigures } from '../src/traffic'
-
-const NO_TRAFFIC = { received: summarize([]), sent: summarize([]) }
 
 const empty = summarize([])
 
@@ -32,7 +29,10 @@ const healthy = (): RunResult => ({
   wrongPhrases: 0,
   generatorDelayMs: { p99: 1.5, max: 4 },
   ...serverFigures([]),
-  ...trafficFigures(NO_TRAFFIC, NO_TRAFFIC)
+  receivedBytesPerSDuringTrack: summarize([]),
+  sentBytesPerSDuringTrack: summarize([]),
+  receivedBytesPerSWhileSettling: summarize([]),
+  sentBytesPerSWhileSettling: summarize([])
 })
 
 /** One result per threshold, just across its limit, with the figure the failing check must name. */
