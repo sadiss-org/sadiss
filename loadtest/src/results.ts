@@ -4,9 +4,10 @@ import { distancesFromMedian, summarize, Summary } from './stats'
 import { phrases, phraseText, TrackShape } from './track'
 import { Audience } from './audience'
 import { ServerFigures } from './serverSampler'
+import { TrafficFigures } from './traffic'
 import { VirtualPhone } from './virtualPhone'
 
-export interface RunResult extends ServerFigures {
+export interface RunResult extends ServerFigures, TrafficFigures {
   phones: number
   /** Phones that joined during the track. */
   latePhones: number
@@ -109,7 +110,7 @@ export const watch = (audience: Audience, now: () => number = () => performance.
     /** Stops watching without a result, such as when the run failed. */
     stop,
     /** Stops watching and sums up what every phone saw. */
-    finish: (track: TrackShape, chunkCount: number): Omit<RunResult, keyof ServerFigures> => {
+    finish: (track: TrackShape, chunkCount: number): Omit<RunResult, keyof ServerFigures | keyof TrafficFigures> => {
       stop()
       const phones = audience.phones
       const arrivals = phones.flatMap((phone) => phone.arrivals)

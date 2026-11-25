@@ -6,9 +6,12 @@ import { RunResult, watch } from './results'
 import { planRoom } from './room'
 import { Sampled, SamplingTarget, serverFigures, startSampler } from './serverSampler'
 import { createTarget, PreparedPerformance } from './target'
+import { tally, trafficBetween, trafficFigures } from './traffic'
 
 /** How long after the last chunk is due it may still be on its way. */
 const TAIL_MS = 4000
+
+const CHUNK_MS = CHUNK_SECONDS * 1000
 
 /** How often the server under test is sampled. */
 const SAMPLE_EVERY_S = 5
@@ -63,20 +66,32 @@ export const runRoom = async (
       seat
     }))
     await joinGradually(audience, seats.filter(({ seat }) => !seat.late), options.joinOverMs)
+    const settling = tally(audience.phones)
     await sleep(options.settleMs)
     if (audience.phones.every((phone) => phone.connects === 0)) {
       throw new Error(`No phone could connect to ${options.wsUrl}.`)
     }
+    const beforeTrack = trafficBetween(settling, tally(audience.phones))
 
     watching = watch(audience)
     await performance.start()
     const trackMs = performance.chunkCount * CHUNK_SECONDS * 1000
     const lateJoining = joinGradually(audience, seats.filter(({ seat }) => seat.late), trackMs / 2)
-    await sleep(trackMs + TAIL_MS)
+    // The server sends one chunk each chunk's time, the first a chunk after the start and the last as the track's
+    // time ends, so a window of the track's length that starts half a chunk late holds every chunk once.
+    await sleep(CHUNK_MS / 2)
+    const playing = tally(audience.phones)
+    await sleep(trackMs)
+    const duringTrack = trafficBetween(playing, tally(audience.phones))
+    await sleep(TAIL_MS - CHUNK_MS / 2)
     await lateJoining
     await stopTrack(performance, warn)
     const server = await stopSampling()
-    const result = { ...watching.finish(options.track, performance.chunkCount), ...serverFigures(server.samples) }
+    const result = {
+      ...watching.finish(options.track, performance.chunkCount),
+      ...serverFigures(server.samples),
+      ...trafficFigures(beforeTrack, duringTrack)
+    }
     watching = undefined
     return { result, server }
   } finally {

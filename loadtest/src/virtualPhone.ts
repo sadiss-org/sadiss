@@ -3,6 +3,7 @@ import { createClockSync } from "@/composables/clockSync";
 import { connectDevice } from "@/composables/deviceConnection";
 import { Seat } from "./room";
 import { chunkLeadMs } from "@/composables/chunkTiming";
+import { ByteCount, frameBytes, payloadBytes } from "./traffic";
 
 export interface PhoneOptions {
   wsUrl: string;
@@ -38,6 +39,8 @@ export interface VirtualPhone {
   /** How often a connection was opened, and how often a live one was lost. */
   connects: number;
   drops: number;
+  /** The bytes its connections carried, from joining on. */
+  bytes: ByteCount;
   /** Round trip of every clock measurement, in ms. */
   roundTripsMs: number[];
   /** The phone's current estimate of server time minus its own, or null before the first round trip. */
@@ -64,11 +67,21 @@ export const startVirtualPhone = ({
   let live = false;
   let closed = false;
 
-  // Counts every connection the app's socket opens.
+  // Counts every connection the app's socket opens, and the bytes of every frame it carries.
   class CountedWebSocket extends WebSocket {
     constructor(url: string | URL) {
       super(url);
       this.addEventListener("open", () => phone.connects++);
+      this.addEventListener("message", (event) => {
+        phone.bytes.received += frameBytes(payloadBytes(event.data), false);
+      });
+    }
+
+    override send(data: Parameters<WebSocket["send"]>[0]) {
+      // A socket that is not open discards what it is given.
+      if (this.readyState === WebSocket.OPEN)
+        phone.bytes.sent += frameBytes(payloadBytes(data), true);
+      super.send(data);
     }
   }
 
@@ -80,6 +93,7 @@ export const startVirtualPhone = ({
     phrases: [],
     connects: 0,
     drops: 0,
+    bytes: { received: 0, sent: 0 },
     roundTripsMs,
     offsetMs: () => clockSync.clock.offsetMs(),
     close: () => {

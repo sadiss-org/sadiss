@@ -18,6 +18,8 @@ interface Margin {
 const TIME: Margin = { relative: 0.1, absolute: 5 }
 /** A share of CPU may grow by 10% or 5 points, and memory by 10% or 5 MB, whichever is more. */
 const LOAD: Margin = { relative: 0.1, absolute: 5 }
+/** What a phone is sent or sends may grow by 10% or 0.1 kbit/s, whichever is more; the figures are in bytes per second. */
+const TRAFFIC: Margin = { relative: 0.1, absolute: 12.5 }
 /** A count may not grow at all. */
 const COUNT: Margin = { relative: 0, absolute: 0 }
 
@@ -40,6 +42,10 @@ const COMPARED: readonly Compared[] = [
   { figure: 'dropsDuringTrack', better: 'lower', margin: COUNT },
   { figure: 'dropsBeforeTrack', better: 'lower', margin: COUNT },
   { figure: 'generatorDelayMs', statistic: 'p99', better: 'lower', margin: TIME },
+  { figure: 'receivedBytesPerSDuringTrack', statistic: 'median', better: 'lower', margin: TRAFFIC },
+  { figure: 'sentBytesPerSDuringTrack', statistic: 'median', better: 'lower', margin: TRAFFIC },
+  { figure: 'receivedBytesPerSBeforeTrack', statistic: 'median', better: 'lower', margin: TRAFFIC },
+  { figure: 'sentBytesPerSBeforeTrack', statistic: 'median', better: 'lower', margin: TRAFFIC },
   { figure: 'serverCpuPct', statistic: 'p95', better: 'lower', margin: LOAD },
   { figure: 'serverCpuPct', statistic: 'max', better: 'lower', margin: LOAD },
   { figure: 'serverRssMb', statistic: 'max', better: 'lower', margin: LOAD },

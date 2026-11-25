@@ -28,6 +28,10 @@ const step = (phones: number, spoil: (result: RunResult) => void = () => undefin
     missingPhrases: 0,
     wrongPhrases: 0,
     generatorDelayMs: { p99: 0.85, max: 3 },
+    receivedBytesPerSDuringTrack: { count: 3, min: 3800, median: 3877.5, p1: 3800, p95: 3900, p99: 3900, max: 3900 },
+    sentBytesPerSDuringTrack: empty,
+    receivedBytesPerSBeforeTrack: empty,
+    sentBytesPerSBeforeTrack: empty,
     ...serverFigures([])
   }
   spoil(result)
@@ -39,6 +43,10 @@ describe('the report of a ramp', () => {
     const line = rampStepLine(step(75))
     expect(line).toMatch(/^75 phones\s+PASS/)
     expect(line).toContain('p99 248.87 ms')
+  })
+
+  it('shows on a step’s line how much the server sent each phone while the track played', () => {
+    expect(rampStepLine(step(75))).toContain('to each phone 31.02 kbit/s')
   })
 
   it('names the phones at the break, the last step that passed, and every check the break missed', () => {
