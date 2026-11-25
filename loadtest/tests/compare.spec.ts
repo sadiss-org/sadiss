@@ -28,6 +28,10 @@ const result = (): RunResult => ({
   missingPhrases: 0,
   wrongPhrases: 0,
   generatorDelayMs: { p99: 0.8, max: 3 },
+  receivedBytesPerSDuringTrack: spread(3900, 3880, 3950),
+  sentBytesPerSDuringTrack: spread(16, 15, 18),
+  receivedBytesPerSWhileSettling: spread(36, 35, 40),
+  sentBytesPerSWhileSettling: spread(16, 15, 18),
   ...serverFigures([]),
   serverCpuPct: spread(20, 5, 60),
   serverRestarts: 0
@@ -109,6 +113,27 @@ describe('comparing runs', () => {
     const comparison = compareRuns([record(), record((run) => ((run.serverCpuPct.p95 = 67), (run.serverRestarts = 1)))])
     expect(row(comparison, 'Server CPU of one core p95').cells[1]?.worse).toBe(true)
     expect(row(comparison, 'Server restarts').cells[1]?.worse).toBe(true)
+  })
+
+  it('marks a phone being sent more than 10% or 0.1 kbit/s more per second than in the baseline', () => {
+    const received = (median: number) =>
+      row(compareRuns([record(), record((run) => (run.receivedBytesPerSDuringTrack.median = median))]), 'Server to each phone, track median')
+    expect(received(4291).cells[1]?.worse).toBe(true)
+    expect(received(4289).cells[1]?.worse).toBe(false)
+    const sent = (median: number) =>
+      row(compareRuns([record(), record((run) => (run.sentBytesPerSWhileSettling.median = median))]), 'Each phone to server, settling median')
+    expect(sent(28.6).cells[1]?.worse).toBe(true)
+    expect(sent(28.4).cells[1]?.worse).toBe(false)
+  })
+
+  it('marks nothing about the bytes per phone against a results file made before they were counted', () => {
+    const older = record()
+    Reflect.deleteProperty(older.result, 'receivedBytesPerSDuringTrack')
+    const comparison = compareRuns([older, record((run) => (run.receivedBytesPerSDuringTrack.median = 9000))])
+    expect(row(comparison, 'Server to each phone, track median').cells).toEqual([
+      { value: null, worse: false },
+      { value: 9000, worse: false }
+    ])
   })
 
   it('marks nothing about the server when a run did not sample it', () => {

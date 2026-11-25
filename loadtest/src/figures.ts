@@ -4,6 +4,7 @@ export const ms = (value: number | null) => (value === null ? '-' : `${Number(va
 export const count = (value: number | null) => (value === null ? '-' : String(Math.round(value)))
 const percent = (value: number | null) => (value === null ? '-' : `${Number(value.toFixed(1))}%`)
 const mb = (value: number | null) => (value === null ? '-' : `${Number(value.toFixed(1))} MB`)
+const kbitPerS = (bytesPerS: number | null) => (bytesPerS === null ? '-' : `${Number(((bytesPerS * 8) / 1000).toFixed(2))} kbit/s`)
 const plain = (value: number | null) => (value === null ? '-' : String(Number(value.toFixed(2))))
 
 /** How each figure of a run is named and shown, in the figure lines, the check lines and the comparison of runs alike. */
@@ -27,6 +28,10 @@ export const FIGURES: Record<keyof RunResult, { label: string; unit: (value: num
   dropsDuringTrack: { label: 'Drops during the track', unit: count },
   dropsBeforeTrack: { label: 'Drops before the track', unit: count },
   generatorDelayMs: { label: 'Generator event loop', unit: ms },
+  receivedBytesPerSDuringTrack: { label: 'Server to each phone, track', unit: kbitPerS },
+  sentBytesPerSDuringTrack: { label: 'Each phone to server, track', unit: kbitPerS },
+  receivedBytesPerSWhileSettling: { label: 'Server to each phone, settling', unit: kbitPerS },
+  sentBytesPerSWhileSettling: { label: 'Each phone to server, settling', unit: kbitPerS },
   serverCpuPct: { label: 'Server CPU of one core', unit: percent },
   serverRssMb: { label: 'Server memory', unit: mb },
   serverSockets: { label: 'Server open sockets', unit: count },

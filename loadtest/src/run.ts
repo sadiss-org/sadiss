@@ -6,6 +6,8 @@ import { RunResult, watch } from './results'
 import { planRoom } from './room'
 import { Sampled, SamplingTarget, serverFigures, startSampler } from './serverSampler'
 import { createTarget, PreparedPerformance } from './target'
+import { tally, trafficBetween } from './traffic'
+import { trackWindow } from './chunkSchedule'
 
 /** How long after the last chunk is due it may still be on its way. */
 const TAIL_MS = 4000
@@ -63,20 +65,37 @@ export const runRoom = async (
       seat
     }))
     await joinGradually(audience, seats.filter(({ seat }) => !seat.late), options.joinOverMs)
+    const settling = tally(audience.phones)
     await sleep(options.settleMs)
     if (audience.phones.every((phone) => phone.connects === 0)) {
       throw new Error(`No phone could connect to ${options.wsUrl}.`)
     }
+    // The phones' traffic while they settle their clocks, as between two tracks.
+    const whileSettling = trafficBetween(settling, tally(audience.phones))
 
     watching = watch(audience)
     await performance.start()
+    const startedAtMs = Date.now()
     const trackMs = performance.chunkCount * CHUNK_SECONDS * 1000
     const lateJoining = joinGradually(audience, seats.filter(({ seat }) => seat.late), trackMs / 2)
-    await sleep(trackMs + TAIL_MS)
+    // The phones' traffic while the track plays.
+    const window = trackWindow(performance.chunkCount)
+    await sleep(Math.max(0, startedAtMs + window.fromMs - Date.now()))
+    const playing = tally(audience.phones)
+    await sleep(Math.max(0, startedAtMs + window.toMs - Date.now()))
+    const duringTrack = trafficBetween(playing, tally(audience.phones))
+    await sleep(Math.max(0, startedAtMs + trackMs + TAIL_MS - Date.now()))
     await lateJoining
     await stopTrack(performance, warn)
     const server = await stopSampling()
-    const result = { ...watching.finish(options.track, performance.chunkCount), ...serverFigures(server.samples) }
+    const result = {
+      ...watching.finish(options.track, performance.chunkCount),
+      ...serverFigures(server.samples),
+      receivedBytesPerSDuringTrack: duringTrack.received,
+      sentBytesPerSDuringTrack: duringTrack.sent,
+      receivedBytesPerSWhileSettling: whileSettling.received,
+      sentBytesPerSWhileSettling: whileSettling.sent
+    }
     watching = undefined
     return { result, server }
   } finally {

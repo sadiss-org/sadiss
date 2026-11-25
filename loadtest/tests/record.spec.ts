@@ -29,7 +29,11 @@ const run: RunResult = {
   missingPhrases: 0,
   wrongPhrases: 0,
   generatorDelayMs: { p99: 0.8, max: 3 },
-  ...serverFigures([])
+  ...serverFigures([]),
+  receivedBytesPerSDuringTrack: summarize([]),
+  sentBytesPerSDuringTrack: summarize([]),
+  receivedBytesPerSWhileSettling: summarize([]),
+  sentBytesPerSWhileSettling: summarize([])
 }
 
 const record = {

@@ -33,7 +33,7 @@ console.log(
     ...rows.map(({ label, unit, cells }) => line(label, cells.map(({ value, worse }) => `${unit(value)}${worse ? '  WORSE' : ''}`))),
     ...(differences.length ? ['', ...differences.map((difference) => `Note: ${difference}`)] : []),
     '',
-    'WORSE: further from good than the baseline by more than 10% or 5 ms for a time, or by any amount for a count.'
+    'WORSE: further from good than the baseline by more than 10% or 5 ms for a time, 10% or 0.1 kbit/s for what a phone is sent or sends, or by any amount for a count.'
   ].join('\n')
 )
 paths.forEach((path, index) => console.log(`${index === 0 ? 'baseline' : `run ${index + 1}`}: ${path}`))

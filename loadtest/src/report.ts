@@ -68,6 +68,10 @@ export const runReport = (result: RunResult, server: Sampled, verdict: Verdict) 
     countLine('connects', result.connects),
     countLine('dropsDuringTrack', result.dropsDuringTrack),
     countLine('dropsBeforeTrack', result.dropsBeforeTrack),
+    summaryLine('receivedBytesPerSDuringTrack', result.receivedBytesPerSDuringTrack),
+    summaryLine('sentBytesPerSDuringTrack', result.sentBytesPerSDuringTrack),
+    summaryLine('receivedBytesPerSWhileSettling', result.receivedBytesPerSWhileSettling),
+    summaryLine('sentBytesPerSWhileSettling', result.sentBytesPerSWhileSettling),
     ...phraseLines,
     ...serverLines,
     `${FIGURES.generatorDelayMs.label.padEnd(LABEL_WIDTH)} p99 ${ms(result.generatorDelayMs.p99)}, max ${ms(result.generatorDelayMs.max)}`,
@@ -78,7 +82,7 @@ export const runReport = (result: RunResult, server: Sampled, verdict: Verdict) 
   ].join('\n')
 }
 
-/** The figures of one ramp step on one line, the clock round trip's p99 among them, so the steps read as a table. */
+/** The figures of one ramp step on one line, the clock round trip's p99 and what the server sent each phone while the track played among them, so the steps read as a table. */
 export const rampStepLine = ({ phones, result, verdict }: RampStep) => {
   const cell = (label: string, value: string, width: number) => `${label} ${value}`.trim().padEnd(width)
   return [
@@ -90,6 +94,7 @@ export const rampStepLine = ({ phones, result, verdict }: RampStep) => {
     cell('p99', FIGURES.roundTripMs.unit(result.roundTripMs.p99), 14),
     cell('missing', String(result.missingChunks), 11),
     cell('drops', String(result.dropsDuringTrack), 9),
+    cell('to each phone', FIGURES.receivedBytesPerSDuringTrack.unit(result.receivedBytesPerSDuringTrack.median), 28),
     cell('CPU max', FIGURES.serverCpuPct.unit(result.serverCpuPct.max), 15),
     cell('memory max', FIGURES.serverRssMb.unit(result.serverRssMb.max), 22),
     cell('generator p99', ms(result.generatorDelayMs.p99), 0)

@@ -28,7 +28,11 @@ const result = (phones: number, spoil: (result: RunResult) => void = () => undef
     missingPhrases: 0,
     wrongPhrases: 0,
     generatorDelayMs: { p99: 1, max: 2 },
-    ...serverFigures([])
+    ...serverFigures([]),
+    receivedBytesPerSDuringTrack: summarize([]),
+    sentBytesPerSDuringTrack: summarize([]),
+    receivedBytesPerSWhileSettling: summarize([]),
+    sentBytesPerSWhileSettling: summarize([])
   }
   spoil(run)
   return run

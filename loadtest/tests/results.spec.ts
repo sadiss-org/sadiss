@@ -15,6 +15,7 @@ const phone = (overrides: Partial<VirtualPhone> = {}): VirtualPhone => ({
   phrases: [],
   connects: 1,
   drops: 0,
+  bytes: { received: 0, sent: 0 },
   roundTripsMs: [],
   offsetMs: () => 0,
   close: () => undefined,

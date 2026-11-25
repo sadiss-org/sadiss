@@ -28,7 +28,11 @@ const healthy = (): RunResult => ({
   missingPhrases: 0,
   wrongPhrases: 0,
   generatorDelayMs: { p99: 1.5, max: 4 },
-  ...serverFigures([])
+  ...serverFigures([]),
+  receivedBytesPerSDuringTrack: summarize([]),
+  sentBytesPerSDuringTrack: summarize([]),
+  receivedBytesPerSWhileSettling: summarize([]),
+  sentBytesPerSWhileSettling: summarize([])
 })
 
 /** One result per threshold, just across its limit, with the figure the failing check must name. */
