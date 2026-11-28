@@ -90,4 +90,65 @@ describe('clock sync across connections', () => {
 
     expect(sentAt).toEqual([0, 3000, 6000])
   })
+
+  it('pings immediately when asked while running, and resets the interval from that ping', async () => {
+    const { useClockMeasurement } = await import('@/composables/useClockMeasurement')
+    const measurement = useClockMeasurement()
+    const sentAt: number[] = []
+    const startedAt = Date.now()
+
+    measurement.start(() => sentAt.push(Date.now() - startedAt))
+    measurement.handleMessage(configuredEvery(3000))
+    vi.advanceTimersByTime(1000)
+    measurement.pingNow()
+    vi.advanceTimersByTime(3000)
+
+    expect(sentAt).toEqual([0, 1000, 4000])
+  })
+
+  it('does not ping when asked before config arrives or after stopping', async () => {
+    const { useClockMeasurement } = await import('@/composables/useClockMeasurement')
+    const measurement = useClockMeasurement()
+    const sent: MeasureMessage[] = []
+
+    measurement.start((message) => sent.push(message))
+    measurement.pingNow()
+    expect(sent).toHaveLength(0)
+
+    measurement.handleMessage(configuredEvery(3000))
+    expect(sent).toHaveLength(1)
+
+    measurement.stop()
+    measurement.pingNow()
+    expect(sent).toHaveLength(1)
+  })
+
+  it('pings immediately when the app returns to the foreground', async () => {
+    const listeners = new Map<string, () => void>()
+    const fakeDocument = {
+      visibilityState: 'hidden',
+      addEventListener: (event: string, cb: () => void) => listeners.set(event, cb)
+    }
+    vi.stubGlobal('document', fakeDocument)
+    try {
+      const { useClockMeasurement } = await import('@/composables/useClockMeasurement')
+      const measurement = useClockMeasurement()
+      const sent: MeasureMessage[] = []
+
+      measurement.start((message) => sent.push(message))
+      measurement.handleMessage(configuredEvery(3000))
+      expect(sent).toHaveLength(1)
+
+      // Staying hidden does not ping.
+      listeners.get('visibilitychange')?.()
+      expect(sent).toHaveLength(1)
+
+      // Returning to foreground pings at once.
+      fakeDocument.visibilityState = 'visible'
+      listeners.get('visibilitychange')?.()
+      expect(sent).toHaveLength(2)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })

@@ -39,14 +39,35 @@ export class ServerClock {
   private samples: { rtt: number; offset: number }[] = []
 
   /**
-   * @param windowSize   number of recent round trips to keep
-   * @param keepFraction fraction of the window (lowest-RTT) used for the estimate
+   * @param windowSize      number of recent round trips to keep
+   * @param keepFraction    fraction of the window (lowest-RTT) used for the estimate
+   * @param stepThresholdMs offset jump (ms) beyond what round-trip asymmetry alone can
+   *                        explain before pre-step samples are discarded
    */
-  constructor(private readonly windowSize = 20, private readonly keepFraction = 0.5) {}
+  constructor(
+    private readonly windowSize = 20,
+    private readonly keepFraction = 0.5,
+    private readonly stepThresholdMs = 1000
+  ) {}
 
-  /** Feed one measurement round trip. */
+  /**
+   * Feed one measurement round trip.
+   *
+   * When the OS pauses `performance.now()` during sleep (or the server clock steps),
+   * the offset shifts by more than network asymmetry (at most half the round-trip time
+   * of each estimate) can account for. Clearing pre-step samples lets the clock re-lock
+   * on that round trip instead of waiting for the window to flush.
+   */
   add(r: RoundTrip): void {
-    this.samples.push({ rtt: roundTripRtt(r), offset: roundTripOffset(r) })
+    const sample = { rtt: roundTripRtt(r), offset: roundTripOffset(r) }
+    const current = this.estimate()
+    if (current !== null) {
+      const maxNetworkShift = Math.max(0, sample.rtt) / 2 + Math.max(0, current.rttMs) / 2
+      if (Math.abs(sample.offset - current.offsetMs) > this.stepThresholdMs + maxNetworkShift) {
+        this.samples = []
+      }
+    }
+    this.samples.push(sample)
     if (this.samples.length > this.windowSize) this.samples.shift()
   }
 

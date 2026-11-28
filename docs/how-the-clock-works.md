@@ -56,6 +56,14 @@ That is the whole filter, and it is enough: on real devices the offset drifts on
 ~0.4 ms/min, and because the phone re-measures every few seconds it never
 accumulates that drift — so an offset-only estimate suffices (no clock-rate term).
 
+If the OS pauses `performance.now()` during sleep (or the server clock steps), the
+offset jumps by more than network asymmetry (at most half the round-trip time of
+each estimate) can explain. When a round trip differs from the current estimate by
+more than `1000 ms + sample.rtt / 2 + current.rtt / 2`, `ServerClock` clears its
+pre-step window so it re-locks on that first round trip instead of waiting for the
+window to flush. On returning to the foreground (`visibilitychange`), the app also
+sends an immediate ping rather than waiting for the next interval tick.
+
 `ServerClock` exposes one method:
 
 ```

@@ -49,6 +49,50 @@ describe('ServerClock', () => {
     // window holds the last two (199, 299); median = 249
     expect(clock.offsetMs()).toBe(249)
   })
+
+  it('re-locks on the first round trip after OS sleep pauses the local clock', () => {
+    const clock = new ServerClock(20, 0.5)
+    // Fill the window with 20 clean pre-sleep round trips (rtt 20 ms, offset 1000 ms).
+    for (let i = 0; i < 20; i++) {
+      const t0 = i * 3000
+      clock.add(rt(t0, t0 + 1010, t0 + 1010, t0 + 20))
+    }
+    expect(clock.estimate()).toEqual({ offsetMs: 1000, rttMs: 20, roundTrips: 20 })
+
+    // OS sleeps for 27 s: server time advances 27_000 ms while performance.now() pauses.
+    const t0 = 60_000
+    clock.add(rt(t0, t0 + 28_010, t0 + 28_010, t0 + 20))
+
+    expect(clock.estimate()).toEqual({ offsetMs: 28_000, rttMs: 20, roundTrips: 1 })
+  })
+
+  it('re-locks when the offset steps backward', () => {
+    const clock = new ServerClock(20, 0.5)
+    for (let i = 0; i < 10; i++) {
+      const t0 = i * 3000
+      clock.add(rt(t0, t0 + 10_010, t0 + 10_010, t0 + 20))
+    }
+
+    // Server clock steps back 5 s.
+    const t0 = 30_000
+    clock.add(rt(t0, t0 + 5_010, t0 + 5_010, t0 + 20))
+
+    expect(clock.estimate()).toEqual({ offsetMs: 5_000, rttMs: 20, roundTrips: 1 })
+  })
+
+  it('keeps the window when a single stalled round trip is explained by its own RTT', () => {
+    const clock = new ServerClock(20, 0.5)
+    for (let i = 0; i < 10; i++) {
+      const t0 = i * 3000
+      clock.add(rt(t0, t0 + 1010, t0 + 1010, t0 + 20))
+    }
+
+    // Downlink stalls for 10 s: rtt = 10_010 ms, offset shifted by -4_995 ms (within rtt/2).
+    const t0 = 30_000
+    clock.add(rt(t0, t0 + 1010, t0 + 1010, t0 + 10_010))
+
+    expect(clock.estimate()).toEqual({ offsetMs: 1000, rttMs: 20, roundTrips: 11 })
+  })
 })
 
 describe('what the clock says about its own estimate', () => {
