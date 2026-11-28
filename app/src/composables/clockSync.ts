@@ -19,6 +19,8 @@ export interface ClockSync {
   handleMessage(payload: { message?: unknown }): boolean
   /** How often the server has asked for a round trip, or 0 before it has said. */
   intervalMs(): number
+  /** Sends a ping right away and restarts the interval, if pinging is active. */
+  pingNow(): void
   /** Stops pinging. */
   stop(): void
 }
@@ -86,6 +88,9 @@ export const createClockSync = ({
       return true
     },
     intervalMs: () => controller?.getIntervalMs() ?? 0,
+    pingNow: () => {
+      if (pingInterval) restartPinging()
+    },
     stop: stopPinging
   }
 }
