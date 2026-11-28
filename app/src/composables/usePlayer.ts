@@ -24,6 +24,14 @@ const oscillators: OscillatorObject[] = []
 /** How often the audio was built again because its clock had stopped. */
 let restarts = 0
 let clockWatch: ReturnType<typeof setInterval> | undefined
+let visibilityListening = false
+/** True when automatic audio recovery could not restart playback and a tap is needed. */
+const audioNeedsResume = ref(false)
+let lastClockTime = 0
+let checksStandingStill = 0
+let checksSuspended = 0
+let recoveryStep = 0
+let suspendedRetries = 0
 /** The current audio context's output timestamps, as the schedule offset uses them. */
 let readStamp: ReturnType<typeof createStampReader>
 let offset: number
@@ -95,23 +103,59 @@ const silentWavUrl = () => {
 }
 
 /**
- * Loops silence through a media element, so iOS counts the app as playing
- * media for as long as it runs, including the gaps between chunks. Must be
- * called from a user gesture.
+ * Tells WebKit this page plays media and loops silence through a media element,
+ * so iOS counts the app as playing media for as long as it runs, including the
+ * gaps between chunks. Safe to call again after background suspension: resumes
+ * the silent element whenever iOS paused it.
  *
  * The lock screen's play and pause buttons act on this element; they do
  * nothing, because the server decides when a performance plays.
  */
-const startKeepAlive = () => {
-  if (keepAlive) return
-  keepAlive = new Audio(silentWavUrl())
-  keepAlive.loop = true
-  keepAlive.play().catch((error) => console.warn('Silent keep-alive did not start:', error))
+const ensureAudioSession = () => {
+  const { audioSession } = navigator as Navigator & { audioSession?: { type: string } }
+  if (audioSession) audioSession.type = 'playback'
 
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.setActionHandler('play', () => {})
-    navigator.mediaSession.setActionHandler('pause', () => {})
+  if (!keepAlive) {
+    keepAlive = new Audio(silentWavUrl())
+    keepAlive.loop = true
+    keepAlive.play().catch((error) => console.warn('Silent keep-alive did not start:', error))
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => {})
+      navigator.mediaSession.setActionHandler('pause', () => {})
+    }
+    return
   }
+
+  if (keepAlive.paused) {
+    keepAlive.play().catch((error) => console.warn('Silent keep-alive did not start:', error))
+  }
+}
+
+const resetAudioWatch = () => {
+  lastClockTime = ctx ? ctx.currentTime : 0
+  checksStandingStill = 0
+  checksSuspended = 0
+  recoveryStep = 0
+  suspendedRetries = 0
+  audioNeedsResume.value = false
+}
+
+const resumeCtx = (context: AudioContext) => {
+  if (typeof context.resume !== 'function') return
+  void context.resume().catch((error) => console.warn('Audio context did not resume:', error))
+}
+
+/** Cycles a stalled running context through suspend and resume before tearing it down. */
+const cycleAudioCtx = () => {
+  const current = ctx
+  if (!current || typeof current.suspend !== 'function' || typeof current.resume !== 'function') return
+  void current
+    .suspend()
+    .then(() => {
+      if (ctx === current) return current.resume()
+    })
+    .catch((error) => console.warn('Audio context could not be resumed:', error))
 }
 
 /** A figure the platform may not give, such as `outputLatency` in older WebKit. */
@@ -136,15 +180,12 @@ export function usePlayer() {
   }
 
   const startAudioCtx = () => {
-    // Tells WebKit this page plays media, so iOS keeps the context running
-    // while the screen is locked. Needs the app's `audio` background mode.
-    const { audioSession } = navigator as Navigator & { audioSession?: { type: string } }
-    if (audioSession) audioSession.type = 'playback'
-    startKeepAlive()
+    ensureAudioSession()
     // Each join replaces the context of the one before: iOS limits how many a
     // page holds, so one left running per join would end in silence.
     if (ctx) replaceAudioCtx()
     else createAudioCtx()
+    resetAudioWatch()
     watchAudioClock()
   }
 
@@ -160,7 +201,7 @@ export function usePlayer() {
       // Resume ctx when going to sleep/background/etc preventing issue where iOS wouldn't restart playback
       // Taken from https://github.com/Tonejs/Tone.js/issues/995#issuecomment-1005082160
       if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
-        ctx.resume()
+        resumeCtx(ctx)
       }
 
       // When coming back from sleep/background/etc prevent playback of already past notes
@@ -172,27 +213,81 @@ export function usePlayer() {
     setOffset()
   }
 
+  const watchVisibility = () => {
+    if (visibilityListening || typeof document === 'undefined' || typeof document.addEventListener !== 'function') return
+    visibilityListening = true
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !ctx) return
+      ensureAudioSession()
+      if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
+        resumeCtx(ctx)
+      }
+    })
+  }
+
   /**
-   * Builds the audio again whenever its clock stands still while the context
-   * says it is running. Some iPhones stop rendering that way and never report
-   * it, so nothing is heard and the state change handler above never fires. A
-   * suspended or interrupted context is left to that handler.
+   * Watches for audio that stopped rendering after backgrounding or an OS
+   * interruption. For a stalled running clock it first re-asserts the audio
+   * session and cycles suspend/resume, then replaces the context once, and
+   * finally stops restarting and asks for a user tap instead of tearing down
+   * the context every few seconds. For a context stuck suspended while the app
+   * is visible it retries resume once before asking for a tap.
    */
   const watchAudioClock = () => {
+    watchVisibility()
     if (clockWatch) return
-    let lastTime = ctx.currentTime
-    let checksStandingStill = 0
+    lastClockTime = ctx.currentTime
     clockWatch = setInterval(() => {
-      if (ctx.state !== 'running' || ctx.currentTime !== lastTime) {
-        lastTime = ctx.currentTime
-        checksStandingStill = 0
+      if (!ctx) return
+
+      if (ctx.state === 'running' && ctx.currentTime !== lastClockTime) {
+        resetAudioWatch()
         return
       }
+
+      if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
+        checksStandingStill = 0
+        if (document.visibilityState !== 'visible' || audioNeedsResume.value) {
+          checksSuspended = 0
+          return
+        }
+        checksSuspended++
+        if (checksSuspended < CHECKS_STANDING_STILL_BEFORE_RESTART) return
+        checksSuspended = 0
+        if (suspendedRetries === 0) {
+          suspendedRetries = 1
+          ensureAudioSession()
+          resumeCtx(ctx)
+          return
+        }
+        audioNeedsResume.value = true
+        return
+      }
+
+      if (ctx.state !== 'running' || audioNeedsResume.value) return
+
+      checksSuspended = 0
       checksStandingStill++
       if (checksStandingStill < CHECKS_STANDING_STILL_BEFORE_RESTART) return
-      restartAudioCtx()
-      lastTime = ctx.currentTime
       checksStandingStill = 0
+
+      if (recoveryStep === 0) {
+        recoveryStep = 1
+        ensureAudioSession()
+        cycleAudioCtx()
+        return
+      }
+
+      if (recoveryStep === 1) {
+        ensureAudioSession()
+        if (restartAudioCtx()) {
+          recoveryStep = 2
+          lastClockTime = ctx.currentTime
+        }
+        return
+      }
+
+      audioNeedsResume.value = true
     }, CLOCK_CHECK_MS)
   }
 
@@ -221,10 +316,27 @@ export function usePlayer() {
    * Builds the audio again after its clock stood still. When no new context
    * can be made, the old one stays, so the watch tries again.
    */
-  const restartAudioCtx = () => {
-    if (!replaceAudioCtx()) return
+  const restartAudioCtx = (): boolean => {
+    if (!replaceAudioCtx()) return false
     restarts++
     console.warn('The audio clock stood still while running; the audio was built again.')
+    return true
+  }
+
+  /**
+   * Unlocks the audio session, keep-alive, and audio context inside a user
+   * gesture after automatic recovery could not restart playback.
+   */
+  const resumeAudio = () => {
+    if (!ctx) return
+    ensureAudioSession()
+    if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
+      resumeCtx(ctx)
+    } else {
+      restartAudioCtx()
+      if (ctx.state !== 'running') resumeCtx(ctx)
+    }
+    resetAudioWatch()
   }
 
   /**
@@ -422,10 +534,12 @@ export function usePlayer() {
   })
 
   return {
+    audioNeedsResume,
     deviceState,
     takePhraseReports,
     handleChunkData,
     preparePlaybackAndTts,
+    resumeAudio,
     setStartTime,
     setMotionRef,
     setTrackSettings,

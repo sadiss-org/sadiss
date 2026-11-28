@@ -2,11 +2,20 @@
   <ion-page>
     <ion-content :fullscreen="true">
       <BasePage>
-        <div class="flex flex-1 flex-col items-center justify-around">
+        <div
+          class="flex flex-1 flex-col items-center justify-around"
+          @click="handleScreenTap">
           <PerformanceInformation :text-color-danger="!isRegistered && wasRegisteredThisSession" />
           <div class="h-[60vw] w-[60vw]">
+            <button
+              v-if="isRegistered && audioNeedsResume"
+              type="button"
+              class="flex h-full w-full flex-col items-center justify-center rounded-full border-2 border-danger px-4 text-center text-2xl font-bold uppercase text-danger"
+              @click.stop="resumeAudio">
+              Tap to resume
+            </button>
             <ion-button
-              v-if="isRegistered"
+              v-else-if="isRegistered"
               :disabled="true"
               class="pulse flex h-full w-full items-center justify-center rounded-full bg-highlight text-2xl font-bold uppercase">
               <p class="text-4xl text-primary">Active</p>
@@ -41,6 +50,11 @@
               </p>
             </div>
             <p
+              v-else-if="audioNeedsResume"
+              class="text-center text-sm leading-4 text-danger">
+              Audio was paused by your phone. Tap anywhere to resume.
+            </p>
+            <p
               v-else
               class="text-sm leading-4">
               To leave the performance or scan a different code you have to quit and re-start the app.
@@ -60,12 +74,18 @@ import { watch, onUnmounted, onMounted, ref } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { NavigationBar } from '@capawesome/capacitor-navigation-bar'
 import { useMainStore } from '@/stores/MainStore'
+import { usePlayer } from '@/composables/usePlayer'
 import { useWebsocketConnection } from '@/composables/useWebsocketConnection'
 import BasePage from '@/components/BasePage.vue'
 import PerformanceInformation from '@/components/PerformanceInformation.vue'
 
 const mainStore = useMainStore()
 const { establishWebsocketConnection, isRegistered } = useWebsocketConnection()
+const { audioNeedsResume, resumeAudio } = usePlayer()
+
+const handleScreenTap = () => {
+  if (audioNeedsResume.value) resumeAudio()
+}
 
 // Disable hardware and NavigationBar back button on Android
 useBackButton(10, () => {
